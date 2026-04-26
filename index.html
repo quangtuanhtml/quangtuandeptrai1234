@@ -478,6 +478,7 @@ function renderOverview(){
 // ═══════════════════════════════════════════════════════════════
 function renderAccounts(){
   if(!acTo)acTo=todayStr();
+  const usdRate=parseFloat(settings.usd_to_vnd_rate)||26800;
   // Aggregate spend per ad_account_id within [acFrom..acTo]
   const spendMap={};
   spendDaily.forEach(s=>{
@@ -491,7 +492,7 @@ function renderAccounts(){
 
   let html=`
     <h1 class="page-title">Tài khoản quảng cáo</h1>
-    <p class="page-sub">Quản lý ${adAccounts.length} TKQC · Chi tiêu từ ${fmtDate(acFrom)} → ${fmtDate(acTo)}</p>
+    <p class="page-sub">Quản lý ${adAccounts.length} TKQC · Chi tiêu từ ${fmtDate(acFrom)} → ${fmtDate(acTo)} · Tỉ giá USD: ${fmtVnd(usdRate)}đ</p>
 
     <div class="toolbar">
       <button class="btn btn-primary" onclick="openAccountForm()">+ Thêm TKQC</button>
@@ -500,19 +501,17 @@ function renderAccounts(){
       <input type="date" value="${acFrom}" onchange="acFrom=this.value;renderAccounts()" style="font-size:12px;" />
       <span style="color:var(--tx3);">→</span>
       <input type="date" value="${acTo}" onchange="acTo=this.value;renderAccounts()" style="font-size:12px;" />
-      <button class="btn btn-ghost btn-sm" onclick="acFrom='2025-01-01';acTo=todayStr();renderAccounts()" title="Từ đầu 2025 → hôm nay">Toàn kỳ</button>
-      <div style="margin-left:auto;font-size:12px;color:var(--tx3);">Tổng balance: ${adAccounts.reduce((a,b)=>a+(parseFloat(b.balance)||0),0).toFixed(2)}</div>
     </div>
 
     <div class="table-wrap"><div class="table-scroll"><table>
       <thead><tr>
-        <th>Tên</th><th>ID</th><th>Tiền tệ</th><th>Tỷ giá VNĐ</th>
-        <th>Chi tiêu (kỳ)</th><th>Chi tiêu VNĐ (kỳ)</th><th>Số ngày</th><th>Số dư</th><th>Trạng thái</th><th>Cập nhật</th><th></th>
+        <th>Tên</th><th>Trạng Thái</th><th>ID</th><th>Đại lý</th>
+        <th>Chi tiêu</th><th>Chi tiêu (USD)</th><th>Tiền Tệ</th><th></th>
       </tr></thead>
       <tbody>`;
   if(!adAccounts.length){
     const canDiscover=metaToken&&metaBusinessId;
-    html+=`<tr><td colspan="11"><div class="empty-state">
+    html+=`<tr><td colspan="8"><div class="empty-state">
       <div class="empty-state-icon">💳</div>
       <div class="empty-state-title">Chưa có TKQC</div>
       <div class="empty-state-desc">${canDiscover?'Tải tự động từ Business Manager hoặc thêm tay':'Cấu hình Meta token ở tab Admin để tải tự động, hoặc thêm tay'}</div>
@@ -524,20 +523,23 @@ function renderAccounts(){
     </div></td></tr>`;
   }else{
     adAccounts.forEach(a=>{
-      const balLow=(parseFloat(a.balance)||0)<10&&a.currency!=='VND';
       const m=spendMap[a.id]||{native:0,vnd:0,days:new Set()};
+      // Quy đổi USD chuẩn: spend native -> VND -> USD
+      const spendVnd=m.vnd||(m.native*(parseFloat(a.exchange_rate)||0));
+      const spendUsd=spendVnd>0?spendVnd/usdRate:0;
+      // Đại lý hiển thị
+      const aids=Array.isArray(a.agency_ids)?a.agency_ids:[];
+      const agNames=aids.map(id=>{const ag=agencies.find(x=>x.id===id);return ag?ag.name:null;}).filter(Boolean);
+      const agText=agNames.length?agNames.join(', '):'<span style="color:var(--tx3);">—</span>';
       const isOpen=acExpandedId===a.id;
       html+=`<tr>
-        <td><div style="font-weight:500;">${esc(a.name)}</div><div style="font-size:11px;color:var(--tx3);">${a.is_active?'Active':'<span style="color:var(--red);">Inactive</span>'}</div></td>
+        <td><div style="font-weight:500;">${esc(a.name)}</div></td>
+        <td>${a.is_active?'<span class="badge b-green">Active</span>':'<span class="badge b-red">Inactive</span>'}</td>
         <td class="mono" style="font-size:12px;color:var(--tx3);">${esc(a.meta_account_id)}</td>
-        <td><span class="badge b-${a.currency==='USD'?'green':(a.currency==='EUR'?'amber':'blue')}">${esc(a.currency)}</span></td>
-        <td><input class="inline-input" type="number" step="0.0001" value="${a.exchange_rate||0}" onchange="updateExchangeRate(${a.id},this.value)" /></td>
+        <td style="font-size:12px;max-width:200px;">${agText}</td>
         <td class="mono">${m.native>0?fmtCur(m.native,a.currency):'<span style="color:var(--tx3);">—</span>'}</td>
-        <td class="mono" style="font-weight:600;">${m.vnd>0?fmtVnd(m.vnd):'<span style="color:var(--tx3);font-weight:400;">—</span>'}</td>
-        <td class="mono" style="font-size:12px;color:var(--tx3);">${m.days.size||0}</td>
-        <td class="mono" style="${balLow?'color:var(--red);font-weight:600;':''}">${fmtCur(a.balance,a.currency)}</td>
-        <td>${statusBadge(a.status)}</td>
-        <td style="font-size:12px;color:var(--tx3);">${a.updated_at?fmtDate(a.updated_at):'—'}</td>
+        <td class="mono" style="font-weight:600;color:var(--green);">${spendUsd>0?'$'+fmtNum(spendUsd,2):'<span style="color:var(--tx3);font-weight:400;">—</span>'}</td>
+        <td><span class="badge b-${a.currency==='USD'?'green':(a.currency==='EUR'?'amber':'blue')}">${esc(a.currency)}</span></td>
         <td style="white-space:nowrap;">
           <button class="btn btn-ghost btn-sm" onclick="toggleAccountDays(${a.id})" title="Xem chi tiêu từng ngày">${isOpen?'▾ Ẩn':'▸ Theo ngày'}</button>
           <button class="btn btn-ghost btn-sm" onclick="openAccountForm(${a.id})">Sửa</button>
@@ -555,15 +557,17 @@ function renderAccounts(){
           byDate[s.date].n++;
         });
         const days=Object.keys(byDate).sort().reverse();
-        html+=`<tr><td colspan="11" style="padding:0;background:var(--bg2);">
+        html+=`<tr><td colspan="8" style="padding:0;background:var(--bg2);">
           <div style="padding:10px 16px;font-size:12px;color:var(--tx3);">Chi tiêu theo ngày của <b>${esc(a.name)}</b> · ${days.length} ngày</div>`;
         if(!days.length){
           html+=`<div style="padding:14px;text-align:center;color:var(--tx3);font-size:12px;">Không có chi tiêu trong khoảng đã chọn — thử bấm Sync Meta API</div>`;
         }else{
-          html+=`<table style="margin:0;"><thead><tr><th style="font-size:11px;">Ngày</th><th style="font-size:11px;">Số campaign</th><th style="font-size:11px;">Spend</th><th style="font-size:11px;">VNĐ thu khách</th></tr></thead><tbody>`;
+          html+=`<table style="margin:0;"><thead><tr><th style="font-size:11px;">Ngày</th><th style="font-size:11px;">Số campaign</th><th style="font-size:11px;">Spend</th><th style="font-size:11px;">Quy USD</th></tr></thead><tbody>`;
           days.forEach(d=>{
             const x=byDate[d];
-            html+=`<tr><td style="font-size:12px;">${fmtDate(d)}</td><td class="mono" style="font-size:12px;color:var(--tx3);">${x.n}</td><td class="mono" style="font-size:12px;">${fmtCur(x.native,a.currency)}</td><td class="mono" style="font-size:12px;font-weight:600;">${fmtVnd(x.vnd)}</td></tr>`;
+            const xVnd=x.vnd||(x.native*(parseFloat(a.exchange_rate)||0));
+            const xUsd=xVnd>0?xVnd/usdRate:0;
+            html+=`<tr><td style="font-size:12px;">${fmtDate(d)}</td><td class="mono" style="font-size:12px;color:var(--tx3);">${x.n}</td><td class="mono" style="font-size:12px;">${fmtCur(x.native,a.currency)}</td><td class="mono" style="font-size:12px;font-weight:600;color:var(--green);">${xUsd>0?'$'+fmtNum(xUsd,2):'—'}</td></tr>`;
           });
           html+=`</tbody></table>`;
         }
@@ -594,18 +598,25 @@ async function updateExchangeRate(id,val){
 function openAccountForm(id){
   const a=id?adAccounts.find(x=>x.id===id):{};
   const isEdit=!!id;
+  const aids=Array.isArray(a.agency_ids)?a.agency_ids:[];
+  const agencyChecks=agencies.length
+    ? agencies.map(ag=>`<label style="display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--bd);border-radius:6px;font-size:12px;cursor:pointer;background:${aids.includes(ag.id)?'var(--bg2)':'transparent'};"><input type="checkbox" class="f-agency-chk" value="${ag.id}" ${aids.includes(ag.id)?'checked':''} /> ${esc(ag.name||ag.code||('#'+ag.id))}</label>`).join('')
+    : '<span style="color:var(--tx3);font-size:12px;">Chưa có đại lý — tạo ở tab Đại lý trước</span>';
   const body=`
     <div class="form-grid">
       <div class="form-group"><label>Tên hiển thị *</label><input id="f-name" value="${esc(a.name||'')}" placeholder="VD: TKQC Main USD" /></div>
       <div class="form-group"><label>Meta Account ID *</label><input id="f-mid" value="${esc(a.meta_account_id||'')}" placeholder="act_xxxxxxx" ${isEdit?'readonly':''} /></div>
       <div class="form-group"><label>Tiền tệ *</label><select id="f-cur"><option ${a.currency==='USD'?'selected':''}>USD</option><option ${a.currency==='EUR'?'selected':''}>EUR</option><option ${a.currency==='VND'?'selected':''}>VND</option></select></div>
       <div class="form-group"><label>Tỷ giá → VNĐ</label><input id="f-rate" type="number" step="0.0001" value="${a.exchange_rate||''}" placeholder="VD: 26800" /></div>
-      <div class="form-group"><label>Trạng thái</label><input id="f-status" value="${esc(a.status||'ACTIVE')}" /></div>
+      <div class="form-group"><label>Số dư (native)</label><input id="f-bal" type="number" step="0.01" value="${a.balance||''}" /></div>
+      <div class="form-group"><label>Trạng thái Meta</label><input id="f-status" value="${esc(a.status||'ACTIVE')}" /></div>
       <div class="form-group"><label>Spend cap (native)</label><input id="f-cap" type="number" step="0.01" value="${a.spend_cap||''}" /></div>
       <div class="form-group"><label>Đã tiêu (native)</label><input id="f-spent" type="number" step="0.01" value="${a.amount_spent||''}" /></div>
-      <div class="form-group"><label>Số dư (native)</label><input id="f-bal" type="number" step="0.01" value="${a.balance||''}" /></div>
       <div class="form-group"><label>Business ID</label><input id="f-biz" value="${esc(a.business_id||'')}" /></div>
       <div class="form-group"><label>Active</label><select id="f-active"><option value="true" ${a.is_active!==false?'selected':''}>Có</option><option value="false" ${a.is_active===false?'selected':''}>Không</option></select></div>
+    </div>
+    <div class="form-group"><label>Đại lý đang chạy trên TKQC này (chọn nhiều)</label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;padding:6px;border:1px solid var(--bd);border-radius:6px;max-height:140px;overflow:auto;background:var(--bg);">${agencyChecks}</div>
     </div>
     <div class="form-group"><label>Ghi chú</label><textarea id="f-note">${esc(a.note||'')}</textarea></div>
   `;
@@ -619,6 +630,7 @@ function openAccountForm(id){
 }
 
 async function saveAccount(id){
+  const agencyIds=Array.from(document.querySelectorAll('.f-agency-chk:checked')).map(c=>parseInt(c.value)).filter(Boolean);
   const data={
     name:document.getElementById('f-name').value.trim(),
     meta_account_id:document.getElementById('f-mid').value.trim(),
@@ -630,7 +642,8 @@ async function saveAccount(id){
     balance:parseFloat(document.getElementById('f-bal').value)||null,
     business_id:document.getElementById('f-biz').value.trim()||null,
     is_active:document.getElementById('f-active').value==='true',
-    note:document.getElementById('f-note').value.trim()||null
+    note:document.getElementById('f-note').value.trim()||null,
+    agency_ids:agencyIds
   };
   if(!data.name||!data.meta_account_id)return toast('Tên và Meta Account ID bắt buộc','err');
   try{
