@@ -895,6 +895,10 @@ async function deleteAccount(id){
 let agSearch='',agFilter='all';
 function renderAgencies(){
   const debtMap={};agencyDebt.forEach(d=>debtMap[d.agency_id]=d);
+  const usdRate=parseFloat(settings.usd_to_vnd_rate)||26800;
+  const rateSrc=settings.usd_rate_source||'thủ công';
+  const rateUpdatedAt=settings.usd_rate_updated_at||'';
+  const rateAgeText=rateUpdatedAt?('cập nhật '+fmtDate(rateUpdatedAt.slice(0,10))):'chưa cập nhật';
   let list=agencies.slice();
   if(agSearch){
     const q=agSearch.toLowerCase();
@@ -906,9 +910,9 @@ function renderAgencies(){
 
   let html=`
     <h1 class="page-title">Đại lý</h1>
-    <p class="page-sub">${agencies.length} đại lý · ${agencies.filter(a=>a.is_active).length} active</p>
+    <p class="page-sub">${agencies.length} đại lý · ${agencies.filter(a=>a.is_active).length} active · Tỉ giá USD: ${fmtVnd(usdRate)}đ</p>
 
-    <div class="toolbar">
+    <div class="toolbar" style="flex-wrap:wrap;gap:8px;">
       <input class="grow" id="ag-search" placeholder="Tìm theo mã, tên, SĐT..." value="${esc(agSearch)}" oninput="agSearch=this.value;renderAgencies()" />
       <select onchange="agFilter=this.value;renderAgencies()">
         <option value="all" ${agFilter==='all'?'selected':''}>Tất cả</option>
@@ -917,6 +921,16 @@ function renderAgencies(){
         <option value="over" ${agFilter==='over'?'selected':''}>Nợ vượt ngưỡng</option>
       </select>
       <button class="btn btn-primary" onclick="openAgencyForm()">+ Thêm khách hàng</button>
+      <span style="margin-left:auto;font-size:12px;color:var(--tx3);">Hiển thị:</span>
+      <select onchange="displayCcy=this.value;renderAgencies()" style="font-size:12px;">
+        <option value="MIX" ${displayCcy==='MIX'?'selected':''}>MIX (gốc + USD)</option>
+        <option value="USD" ${displayCcy==='USD'?'selected':''}>USD</option>
+        <option value="VND" ${displayCcy==='VND'?'selected':''}>VND</option>
+      </select>
+      <span style="font-size:12px;color:var(--tx3);">·</span>
+      <span style="font-size:12px;" title="Nguồn: ${esc(rateSrc)} · ${rateAgeText}">💱 1 USD = <b>${fmtVnd(usdRate)}đ</b></span>
+      <button class="btn btn-ghost btn-sm" onclick="fetchLiveUsdRate(true)" title="Lấy tỉ giá thị trường (VCB Sell)">🔄</button>
+      <button class="btn btn-ghost btn-sm" onclick="editUsdRate()" title="Đặt tỉ giá thủ công">✎</button>
     </div>
 
     <div class="table-wrap"><div class="table-scroll"><table>
@@ -925,7 +939,7 @@ function renderAgencies(){
         <th>Tên Khách Hàng</th>
         <th>Mã Camp</th>
         <th title="Lấy tự động từ Meta API" style="background:#fff8c4;color:#7a5d00;">ID TKQC 🔒</th>
-        <th title="Tổng spend trong toàn kỳ — từ Meta API" style="background:#fff8c4;color:#7a5d00;">Tổng NS đã chạy 🔒</th>
+        <th title="Tổng spend trong toàn kỳ — từ Meta API" style="background:#fff8c4;color:#7a5d00;">Tổng NS đã chạy (${displayCcy}) 🔒</th>
         <th>Tỉ giá chốt</th>
         <th>Rate</th>
         <th>Chốt tiền VNĐ</th>
@@ -977,7 +991,7 @@ function renderAgencies(){
         <td><div style="font-weight:500;">${esc(a.name)}</div>${!a.is_active?'<span class="badge b-gray" style="font-size:10px;">Inactive</span>':''}</td>
         <td><span class="badge b-blue mono">${esc(a.code)}</span></td>
         <td class="mono" style="font-size:12px;background:#fffceb;">${idsLabel}</td>
-        <td class="mono" style="background:#fffceb;font-weight:600;">${spend>0?fmtNum(spend,2)+' '+accCur:'<span style="color:var(--tx3);font-weight:400;">—</span>'}</td>
+        <td style="background:#fffceb;font-weight:600;">${spend>0?fmtSpendDisplay(spend,accCur,(linkedAccs[0]||{}).exchange_rate):'<span class="mono" style="color:var(--tx3);font-weight:400;">—</span>'}</td>
         <td><input class="inline-input" type="number" step="100" min="0" value="${billRate||''}" placeholder="26800" onchange="updateAgencyField(${a.id},'billing_rate_vnd',this.value)" style="width:90px;" /></td>
         <td><input class="inline-input" type="number" step="0.01" min="0" max="1" value="${fee?(fee/100).toFixed(2):''}" placeholder="0.65" onchange="updateAgencyField(${a.id},'fee_percent',parseFloat(this.value)*100)" style="width:60px;" /></td>
         <td class="mono" style="font-weight:600;">${chotVnd?fmtVnd(chotVnd):'<span style="color:var(--tx3);font-weight:400;">—</span>'}</td>
@@ -1014,12 +1028,10 @@ function renderAgencies(){
           html+=`<div style="padding:14px;text-align:center;color:var(--tx3);font-size:12px;">Chưa có chi tiêu — đảm bảo TKQC đã được gán & bấm Sync Meta API</div>`;
         }else{
           const usdR=parseFloat(settings.usd_to_vnd_rate)||26800;
-          html+=`<table style="margin:0;"><thead><tr><th style="font-size:11px;">Ngày</th><th style="font-size:11px;">Số TKQC</th><th style="font-size:11px;">Số campaign</th><th style="font-size:11px;">Spend (${esc(accCur)})</th><th style="font-size:11px;">Quy USD</th><th style="font-size:11px;">Quy VNĐ</th></tr></thead><tbody>`;
+          html+=`<table style="margin:0;"><thead><tr><th style="font-size:11px;">Ngày</th><th style="font-size:11px;">Số TKQC</th><th style="font-size:11px;">Số campaign</th><th style="font-size:11px;">Chi tiêu (${displayCcy})</th></tr></thead><tbody>`;
           days.forEach(d=>{
             const x=byDate[d];
-            const xVnd=x.vnd||(x.native*(parseFloat((linkedAccs[0]||{}).exchange_rate)||0));
-            const xUsd=xVnd>0?xVnd/usdR:0;
-            html+=`<tr><td style="font-size:12px;">${fmtDate(d)}</td><td class="mono" style="font-size:12px;color:var(--tx3);">${x.accs.size}</td><td class="mono" style="font-size:12px;color:var(--tx3);">${x.n}</td><td class="mono" style="font-size:12px;">${fmtNum(x.native,2)}</td><td class="mono" style="font-size:12px;color:var(--green);">${xUsd>0?'$'+fmtNum(xUsd,2):'—'}</td><td class="mono" style="font-size:12px;font-weight:600;">${xVnd>0?fmtVnd(xVnd):'—'}</td></tr>`;
+            html+=`<tr><td style="font-size:12px;">${fmtDate(d)}</td><td class="mono" style="font-size:12px;color:var(--tx3);">${x.accs.size}</td><td class="mono" style="font-size:12px;color:var(--tx3);">${x.n}</td><td style="font-size:12px;">${fmtSpendDisplay(x.native,accCur,(linkedAccs[0]||{}).exchange_rate)}</td></tr>`;
           });
           html+=`</tbody></table>`;
         }
