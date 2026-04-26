@@ -247,7 +247,7 @@ let adAccounts=[],agencies=[],spendDaily=[],payments=[],policyAlerts=[],settings
 let agencyDebt=[]; // computed from view v_agency_debt
 let metaToken='',metaBusinessId='',codePattern='^([A-Z0-9]+)-';
 let filterDateFrom='',filterDateTo='',filterAgencyId='',filterAccountId='';
-let acFrom='2025-01-01',acTo='',acExpandedId=null;
+let acFrom='2025-01-01',acTo='',acExpandedId=null,agExpandedId=null;
 let isLoading=false;
 
 // ─── Helpers ───
@@ -370,6 +370,18 @@ function updateAlertBadge(){
 // ═══════════════════════════════════════════════════════════════
 // PAGE ROUTER
 // ═══════════════════════════════════════════════════════════════
+let lastAutoSyncAt=0;
+async function maybeAutoSync(force){
+  if(!metaToken||!adAccounts.length)return;
+  const now=Date.now();
+  if(!force&&now-lastAutoSyncAt<5*60*1000)return; // throttle 5 phút
+  lastAutoSyncAt=now;
+  try{await syncMeta();}catch(e){}
+  await loadAll();
+  const renders=[renderOverview,renderAccounts,renderAgencies,renderSpend,renderPayments,renderAlerts,renderAdmin];
+  renders[curPage]&&renders[curPage]();
+}
+
 async function pg(n){
   curPage=n;
   document.querySelectorAll('.nav-item').forEach(el=>{
@@ -383,6 +395,8 @@ async function pg(n){
   await loadAll();
   const renders=[renderOverview,renderAccounts,renderAgencies,renderSpend,renderPayments,renderAlerts,renderAdmin];
   renders[n]();
+  // Auto-sync ngầm: chỉ trigger khi vào trang TKQC (1) hoặc Đại lý (2)
+  if(n===1||n===2)maybeAutoSync(false);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -496,7 +510,7 @@ function renderAccounts(){
 
     <div class="toolbar">
       <button class="btn btn-primary" onclick="openAccountForm()">+ Thêm TKQC</button>
-      <button class="btn btn-green" onclick="syncMeta()" ${metaToken?'':'disabled title="Cấu hình Meta token ở tab Admin trước"'}>⟳ Sync Meta API</button>
+      <span id="auto-sync-indicator" style="font-size:12px;color:var(--tx3);">${metaToken?'⟳ Đang đồng bộ Meta…':'⚠ Cấu hình Meta token ở Admin'}</span>
       <span style="color:var(--tx3);font-size:12px;margin-left:8px;">Khoảng:</span>
       <input type="date" value="${acFrom}" onchange="acFrom=this.value;renderAccounts()" style="font-size:12px;" />
       <span style="color:var(--tx3);">→</span>
@@ -506,7 +520,7 @@ function renderAccounts(){
     <div class="table-wrap"><div class="table-scroll"><table>
       <thead><tr>
         <th>Tên</th><th>Trạng Thái</th><th>ID</th><th>Đại lý</th>
-        <th>Chi tiêu</th><th>Chi tiêu (USD)</th><th>Tiền Tệ</th><th></th>
+        <th>Chi tiêu</th><th>Chi tiêu (USD) <button class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px;margin-left:4px;" onclick="editUsdRate()" title="Sửa tỉ giá USD chuẩn">✎ ${fmtVnd(usdRate)}đ</button></th><th>Tiền Tệ</th><th></th>
       </tr></thead>
       <tbody>`;
   if(!adAccounts.length){
@@ -527,10 +541,10 @@ function renderAccounts(){
       // Quy đổi USD chuẩn: spend native -> VND -> USD
       const spendVnd=m.vnd||(m.native*(parseFloat(a.exchange_rate)||0));
       const spendUsd=spendVnd>0?spendVnd/usdRate:0;
-      // Đại lý hiển thị
+      // Đại lý hiển thị (link sang trang Đại lý + mở breakdown)
       const aids=Array.isArray(a.agency_ids)?a.agency_ids:[];
-      const agNames=aids.map(id=>{const ag=agencies.find(x=>x.id===id);return ag?ag.name:null;}).filter(Boolean);
-      const agText=agNames.length?agNames.join(', '):'<span style="color:var(--tx3);">—</span>';
+      const agLinks=aids.map(id=>{const ag=agencies.find(x=>x.id===id);return ag?`<a href="javascript:void(0)" onclick="goAgency(${ag.id})" style="color:var(--blue);text-decoration:none;" title="Mở chi tiêu theo ngày của ${esc(ag.name)}">${esc(ag.name)}</a>`:null;}).filter(Boolean);
+      const agText=agLinks.length?agLinks.join(', '):'<span style="color:var(--tx3);">—</span>';
       const isOpen=acExpandedId===a.id;
       html+=`<tr>
         <td><div style="font-weight:500;">${esc(a.name)}</div></td>
@@ -582,6 +596,21 @@ function renderAccounts(){
 function toggleAccountDays(id){
   acExpandedId=acExpandedId===id?null:id;
   renderAccounts();
+}
+
+async function editUsdRate(){
+  const cur=parseFloat(settings.usd_to_vnd_rate)||26800;
+  const v=prompt('Tỉ giá USD → VNĐ chuẩn (dùng để quy đổi Chi tiêu USD):',cur);
+  if(v===null)return;
+  const n=parseFloat(String(v).replace(/[.,]/g,''))||parseFloat(v);
+  if(!n||n<1000)return toast('Tỉ giá không hợp lệ','err');
+  try{
+    const {error}=await sb.from('app_settings').upsert({key:'usd_to_vnd_rate',value:String(Math.round(n))},{onConflict:'key'});
+    if(error)throw error;
+    settings.usd_to_vnd_rate=String(Math.round(n));
+    toast('Đã lưu tỉ giá USD: '+fmtVnd(n)+'đ','ok');
+    renderAccounts();
+  }catch(e){toast('Lỗi: '+e.message,'err');}
 }
 
 async function updateExchangeRate(id,val){
@@ -720,15 +749,34 @@ function renderAgencies(){
   if(!list.length){
     html+=`<tr><td colspan="13"><div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-title">Chưa có khách hàng</div><div class="empty-state-desc">Bấm "+ Thêm khách hàng" để bắt đầu</div></div></td></tr>`;
   }else{
-    // tổng spend per agency từ spend_daily (toàn kỳ)
-    const spendSum={};
+    // Map TKQC -> danh sách đại lý đang chạy (gộp cả agency_ids[] mới + ad_account_id cũ)
+    const accAgencies={};
+    adAccounts.forEach(acc=>{
+      const ids=new Set(Array.isArray(acc.agency_ids)?acc.agency_ids:[]);
+      agencies.filter(ag=>ag.ad_account_id===acc.id).forEach(ag=>ids.add(ag.id));
+      accAgencies[acc.id]=Array.from(ids);
+    });
+    // tổng spend per agency: ưu tiên match qua agency_id (mã campaign), fallback TKQC độc-1-đại-lý
+    const spendSum={};agencies.forEach(a=>spendSum[a.id]=0);
+    const usdRate2=parseFloat(settings.usd_to_vnd_rate)||26800;
     spendDaily.forEach(s=>{
-      if(!s.agency_id)return;
-      if(!spendSum[s.agency_id])spendSum[s.agency_id]=0;
-      spendSum[s.agency_id]+=parseFloat(s.spend_native)||0;
+      if(s.agency_id&&spendSum[s.agency_id]!=null){
+        spendSum[s.agency_id]+=parseFloat(s.spend_native)||0;
+        return;
+      }
+      const ids=accAgencies[s.ad_account_id]||[];
+      if(ids.length===1&&spendSum[ids[0]]!=null){
+        spendSum[ids[0]]+=parseFloat(s.spend_native)||0;
+      }
+    });
+    // TKQC tổng đã link cho mỗi đại lý (để hiển thị)
+    const accListByAgency={};
+    agencies.forEach(a=>{
+      accListByAgency[a.id]=adAccounts.filter(acc=>(accAgencies[acc.id]||[]).includes(a.id));
     });
     list.forEach((a,idx)=>{
-      const acc=a.ad_account_id?adAccounts.find(x=>x.id===a.ad_account_id):null;
+      const linkedAccs=accListByAgency[a.id]||[];
+      const acc=linkedAccs[0]||(a.ad_account_id?adAccounts.find(x=>x.id===a.ad_account_id):null);
       const accCur=acc?acc.currency:'USD';
       const spend=spendSum[a.id]||0;
       const billRate=parseFloat(a.billing_rate_vnd)||0;
@@ -738,11 +786,15 @@ function renderAgencies(){
       const usdtRate=parseFloat(a.usdt_buy_rate)||0;
       const bankVnd=Math.round(usdt*usdtRate);
       const debt=bankVnd-chotVnd;  // âm = khách còn nợ
+      const idsLabel=linkedAccs.length
+        ? linkedAccs.map(x=>`<div title="${esc(x.name)}">${esc(x.meta_account_id)}</div>`).join('')
+        : '<span style="color:var(--tx3);">— chưa link TKQC</span>';
+      const isOpenAg=agExpandedId===a.id;
       html+=`<tr>
         <td class="mono" style="color:var(--tx3);">${idx+1}</td>
         <td><div style="font-weight:500;">${esc(a.name)}</div>${!a.is_active?'<span class="badge b-gray" style="font-size:10px;">Inactive</span>':''}</td>
         <td><span class="badge b-blue mono">${esc(a.code)}</span></td>
-        <td class="mono" style="font-size:12px;background:#fffceb;">${acc?esc(acc.meta_account_id):'<span style="color:var(--tx3);">— chưa link TKQC</span>'}</td>
+        <td class="mono" style="font-size:12px;background:#fffceb;">${idsLabel}</td>
         <td class="mono" style="background:#fffceb;font-weight:600;">${spend>0?fmtNum(spend,2)+' '+accCur:'<span style="color:var(--tx3);font-weight:400;">—</span>'}</td>
         <td><input class="inline-input" type="number" step="100" min="0" value="${billRate||''}" placeholder="26800" onchange="updateAgencyField(${a.id},'billing_rate_vnd',this.value)" style="width:90px;" /></td>
         <td><input class="inline-input" type="number" step="0.01" min="0" max="1" value="${fee?(fee/100).toFixed(2):''}" placeholder="0.65" onchange="updateAgencyField(${a.id},'fee_percent',parseFloat(this.value)*100)" style="width:60px;" /></td>
@@ -751,14 +803,61 @@ function renderAgencies(){
         <td><input class="inline-input" type="number" step="100" min="0" value="${usdtRate||''}" placeholder="26700" onchange="updateAgencyField(${a.id},'usdt_buy_rate',this.value)" style="width:90px;" /></td>
         <td class="mono">${bankVnd?fmtVnd(bankVnd):'<span style="color:var(--tx3);">—</span>'}</td>
         <td class="mono" style="font-weight:600;color:${debt<0?'var(--red)':'var(--green)'};">${debt!==0?fmtVnd(debt):'<span style="color:var(--tx3);font-weight:400;">—</span>'}</td>
-        <td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-ghost btn-sm" onclick="toggleAgencyDays(${a.id})" title="Xem chi tiêu từng ngày">${isOpenAg?'▾ Ẩn':'▸ Theo ngày'}</button>
           <button class="btn btn-ghost btn-sm" onclick="openAgencyForm(${a.id})">Sửa</button>
         </td>
       </tr>`;
+      if(isOpenAg){
+        // Phân bổ spend theo ngày: ưu tiên agency_id (campaign code), fallback TKQC độc-1-đại-lý
+        const byDate={};
+        spendDaily.forEach(s=>{
+          let belong=false;
+          if(s.agency_id===a.id)belong=true;
+          else{
+            const ids=accAgencies[s.ad_account_id]||[];
+            if(ids.length===1&&ids[0]===a.id&&!s.agency_id)belong=true;
+          }
+          if(!belong)return;
+          if(!byDate[s.date])byDate[s.date]={native:0,vnd:0,n:0,accs:new Set()};
+          byDate[s.date].native+=parseFloat(s.spend_native)||0;
+          byDate[s.date].vnd+=parseInt(s.amount_vnd)||0;
+          byDate[s.date].n++;
+          byDate[s.date].accs.add(s.ad_account_id);
+        });
+        const days=Object.keys(byDate).sort().reverse();
+        html+=`<tr><td colspan="13" style="padding:0;background:var(--bg2);">
+          <div style="padding:10px 16px;font-size:12px;color:var(--tx3);">Chi tiêu theo ngày của <b>${esc(a.name)}</b> · ${days.length} ngày · TKQC: ${linkedAccs.map(x=>esc(x.name)).join(', ')||'—'}</div>`;
+        if(!days.length){
+          html+=`<div style="padding:14px;text-align:center;color:var(--tx3);font-size:12px;">Chưa có chi tiêu — đảm bảo TKQC đã được gán & bấm Sync Meta API</div>`;
+        }else{
+          const usdR=parseFloat(settings.usd_to_vnd_rate)||26800;
+          html+=`<table style="margin:0;"><thead><tr><th style="font-size:11px;">Ngày</th><th style="font-size:11px;">Số TKQC</th><th style="font-size:11px;">Số campaign</th><th style="font-size:11px;">Spend (${esc(accCur)})</th><th style="font-size:11px;">Quy USD</th><th style="font-size:11px;">Quy VNĐ</th></tr></thead><tbody>`;
+          days.forEach(d=>{
+            const x=byDate[d];
+            const xVnd=x.vnd||(x.native*(parseFloat((linkedAccs[0]||{}).exchange_rate)||0));
+            const xUsd=xVnd>0?xVnd/usdR:0;
+            html+=`<tr><td style="font-size:12px;">${fmtDate(d)}</td><td class="mono" style="font-size:12px;color:var(--tx3);">${x.accs.size}</td><td class="mono" style="font-size:12px;color:var(--tx3);">${x.n}</td><td class="mono" style="font-size:12px;">${fmtNum(x.native,2)}</td><td class="mono" style="font-size:12px;color:var(--green);">${xUsd>0?'$'+fmtNum(xUsd,2):'—'}</td><td class="mono" style="font-size:12px;font-weight:600;">${xVnd>0?fmtVnd(xVnd):'—'}</td></tr>`;
+          });
+          html+=`</tbody></table>`;
+        }
+        html+=`</td></tr>`;
+      }
     });
   }
   html+=`</tbody></table></div></div>`;
   document.getElementById('page').innerHTML=html;
+}
+
+function toggleAgencyDays(id){
+  agExpandedId=agExpandedId===id?null:id;
+  renderAgencies();
+}
+
+function goAgency(id){
+  agExpandedId=id;
+  pg(2);
+  setTimeout(()=>{const tr=document.querySelector(`button[onclick="toggleAgencyDays(${id})"]`);if(tr)tr.scrollIntoView({behavior:'smooth',block:'center'});},120);
 }
 
 async function updateAgencyField(id,field,val){
