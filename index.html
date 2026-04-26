@@ -247,7 +247,7 @@ let adAccounts=[],agencies=[],spendDaily=[],payments=[],policyAlerts=[],settings
 let agencyDebt=[]; // computed from view v_agency_debt
 let metaToken='',metaBusinessId='',codePattern='^([A-Z0-9]+)-';
 let filterDateFrom='',filterDateTo='',filterAgencyId='',filterAccountId='';
-let acFrom='2025-01-01',acTo='',acExpandedId=null,agExpandedId=null;
+let acFrom='2025-01-01',acTo='',acExpandedId=null,agExpandedId=null,displayCcy='MIX';
 let isLoading=false;
 
 // ─── Helpers ───
@@ -257,6 +257,19 @@ function fmtNum(n,d){d=d==null?2:d;return (parseFloat(n)||0).toLocaleString('en-
 function fmtCur(n,cur){const v=fmtNum(n,cur==='VND'?0:2);return v+' '+(cur||'');}
 function fmtDate(d){if(!d)return'';const dt=typeof d==='string'?new Date(d):d;return dt.toLocaleDateString('vi-VN');}
 function todayStr(){return new Date().toISOString().slice(0,10);}
+
+// Hiển thị spend theo displayCcy (USD/VND/MIX)
+// Input: native value, currency của TKQC, exchange_rate
+function fmtSpendDisplay(native,cur,exRate){
+  if(!native||native<=0)return '<span style="color:var(--tx3);">—</span>';
+  const usdRate=parseFloat(settings.usd_to_vnd_rate)||26800;
+  const vnd=cur==='VND'?native:native*(parseFloat(exRate)||0);
+  const usd=vnd/usdRate;
+  if(displayCcy==='USD')return '<span class="mono" style="font-weight:600;color:var(--green);">$'+fmtNum(usd,2)+'</span>';
+  if(displayCcy==='VND')return '<span class="mono" style="font-weight:600;">'+fmtVnd(vnd)+'đ</span>';
+  // MIX: native + USD
+  return '<span class="mono">'+fmtCur(native,cur)+'</span> <span style="color:var(--tx3);font-size:11px;">/ $'+fmtNum(usd,2)+'</span>';
+}
 function monthAgo(){const d=new Date();d.setDate(d.getDate()-30);return d.toISOString().slice(0,10);}
 
 // Tìm agency_id phụ trách (ad_account_id, date) theo assignment khoảng ngày
@@ -426,7 +439,7 @@ async function pg(n){
   const renders=[renderOverview,renderAccounts,renderAgencies,renderSpend,renderPayments,renderAlerts,renderAdmin];
   renders[n]();
   // Auto-sync ngầm: chỉ trigger khi vào trang TKQC (1) hoặc Đại lý (2)
-  if(n===1||n===2)maybeAutoSync(false);
+  if(n===1||n===2){maybeAutoSync(false);maybeAutoFetchRate();}
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -523,6 +536,9 @@ function renderOverview(){
 function renderAccounts(){
   if(!acTo)acTo=todayStr();
   const usdRate=parseFloat(settings.usd_to_vnd_rate)||26800;
+  const rateAge=settings.usd_rate_updated_at?Math.round((Date.now()-new Date(settings.usd_rate_updated_at).getTime())/60000):null;
+  const rateAgeText=rateAge==null?'chưa cập nhật':(rateAge<60?rateAge+' phút trước':Math.round(rateAge/60)+' giờ trước');
+  const rateSrc=settings.usd_rate_source||'manual';
   // Aggregate spend per ad_account_id within [acFrom..acTo]
   const spendMap={};
   spendDaily.forEach(s=>{
@@ -538,9 +554,19 @@ function renderAccounts(){
     <h1 class="page-title">Tài khoản quảng cáo</h1>
     <p class="page-sub">Quản lý ${adAccounts.length} TKQC · Chi tiêu từ ${fmtDate(acFrom)} → ${fmtDate(acTo)} · Tỉ giá USD: ${fmtVnd(usdRate)}đ</p>
 
-    <div class="toolbar">
+    <div class="toolbar" style="flex-wrap:wrap;gap:8px;">
       <button class="btn btn-primary" onclick="openAccountForm()">+ Thêm TKQC</button>
       <span id="auto-sync-indicator" style="font-size:12px;color:var(--tx3);">${metaToken?'⟳ Đang đồng bộ Meta…':'⚠ Cấu hình Meta token ở Admin'}</span>
+      <span style="margin-left:auto;font-size:12px;color:var(--tx3);">Hiển thị:</span>
+      <select onchange="displayCcy=this.value;renderAccounts()" style="font-size:12px;">
+        <option value="MIX" ${displayCcy==='MIX'?'selected':''}>MIX (gốc + USD)</option>
+        <option value="USD" ${displayCcy==='USD'?'selected':''}>USD</option>
+        <option value="VND" ${displayCcy==='VND'?'selected':''}>VND</option>
+      </select>
+      <span style="font-size:12px;color:var(--tx3);">·</span>
+      <span style="font-size:12px;" title="Nguồn: ${esc(rateSrc)} · ${rateAgeText}">💱 1 USD = <b>${fmtVnd(usdRate)}đ</b></span>
+      <button class="btn btn-ghost btn-sm" onclick="fetchLiveUsdRate(true)" title="Lấy tỉ giá thị trường (open.er-api.com)">🔄</button>
+      <button class="btn btn-ghost btn-sm" onclick="editUsdRate()" title="Đặt tỉ giá thủ công">✎</button>
     </div>
 
     <div class="toolbar" style="gap:6px;flex-wrap:wrap;">
@@ -561,12 +587,12 @@ function renderAccounts(){
     <div class="table-wrap"><div class="table-scroll"><table>
       <thead><tr>
         <th>Tên</th><th>Trạng Thái</th><th>ID</th><th>Đại lý</th>
-        <th>Chi tiêu</th><th>Chi tiêu (USD) <button class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px;margin-left:4px;" onclick="editUsdRate()" title="Sửa tỉ giá USD chuẩn">✎ ${fmtVnd(usdRate)}đ</button></th><th>Tiền Tệ</th><th></th>
+        <th>Chi tiêu (${displayCcy})</th><th>Tiền Tệ</th><th></th>
       </tr></thead>
       <tbody>`;
   if(!adAccounts.length){
     const canDiscover=metaToken&&metaBusinessId;
-    html+=`<tr><td colspan="8"><div class="empty-state">
+    html+=`<tr><td colspan="7"><div class="empty-state">
       <div class="empty-state-icon">💳</div>
       <div class="empty-state-title">Chưa có TKQC</div>
       <div class="empty-state-desc">${canDiscover?'Tải tự động từ Business Manager hoặc thêm tay':'Cấu hình Meta token ở tab Admin để tải tự động, hoặc thêm tay'}</div>
@@ -579,10 +605,6 @@ function renderAccounts(){
   }else{
     adAccounts.forEach(a=>{
       const m=spendMap[a.id]||{native:0,vnd:0,days:new Set()};
-      // Quy đổi USD chuẩn: spend native -> VND -> USD
-      // Nếu currency=VND thì native CHÍNH LÀ VND, không nhân tỉ giá
-      const spendVnd=a.currency==='VND'?m.native:(m.vnd||(m.native*(parseFloat(a.exchange_rate)||0)));
-      const spendUsd=spendVnd>0?spendVnd/usdRate:0;
       // Đại lý đang gán (assignment còn active)
       const actAsns=activeAssignments(a.id);
       const agLinks=actAsns.map(x=>{const ag=agencies.find(g=>g.id===x.agency_id);if(!ag)return null;const range=fmtDate(x.start_date)+(x.end_date?' → '+fmtDate(x.end_date):' → nay');return `<a href="javascript:void(0)" onclick="goAgency(${ag.id})" style="color:var(--blue);text-decoration:none;" title="${esc(ag.name)} · ${range}">${esc(ag.name)}</a>`;}).filter(Boolean);
@@ -593,8 +615,7 @@ function renderAccounts(){
         <td>${a.is_active?'<span class="badge b-green">Active</span>':'<span class="badge b-red">Inactive</span>'}</td>
         <td class="mono" style="font-size:12px;color:var(--tx3);">${esc(a.meta_account_id)}</td>
         <td style="font-size:12px;max-width:200px;">${agText}</td>
-        <td class="mono">${m.native>0?fmtCur(m.native,a.currency):'<span style="color:var(--tx3);">—</span>'}</td>
-        <td class="mono" style="font-weight:600;color:var(--green);">${spendUsd>0?'$'+fmtNum(spendUsd,2):'<span style="color:var(--tx3);font-weight:400;">—</span>'}</td>
+        <td>${fmtSpendDisplay(m.native,a.currency,a.exchange_rate)}</td>
         <td><span class="badge b-${a.currency==='USD'?'green':(a.currency==='EUR'?'amber':'blue')}">${esc(a.currency)}</span></td>
         <td style="white-space:nowrap;">
           <button class="btn btn-ghost btn-sm" onclick="toggleAccountDays(${a.id})" title="Xem chi tiêu từng ngày">${isOpen?'▾ Ẩn':'▸ Theo ngày'}</button>
@@ -613,17 +634,15 @@ function renderAccounts(){
           byDate[s.date].n++;
         });
         const days=Object.keys(byDate).sort().reverse();
-        html+=`<tr><td colspan="8" style="padding:0;background:var(--bg2);">
+        html+=`<tr><td colspan="7" style="padding:0;background:var(--bg2);">
           <div style="padding:10px 16px;font-size:12px;color:var(--tx3);">Chi tiêu theo ngày của <b>${esc(a.name)}</b> · ${days.length} ngày</div>`;
         if(!days.length){
           html+=`<div style="padding:14px;text-align:center;color:var(--tx3);font-size:12px;">Không có chi tiêu trong khoảng đã chọn — thử bấm Sync Meta API</div>`;
         }else{
-          html+=`<table style="margin:0;"><thead><tr><th style="font-size:11px;">Ngày</th><th style="font-size:11px;">Số campaign</th><th style="font-size:11px;">Spend</th><th style="font-size:11px;">Quy USD</th></tr></thead><tbody>`;
+          html+=`<table style="margin:0;"><thead><tr><th style="font-size:11px;">Ngày</th><th style="font-size:11px;">Số campaign</th><th style="font-size:11px;">Chi tiêu (${displayCcy})</th></tr></thead><tbody>`;
           days.forEach(d=>{
             const x=byDate[d];
-            const xVnd=a.currency==='VND'?x.native:(x.vnd||(x.native*(parseFloat(a.exchange_rate)||0)));
-            const xUsd=xVnd>0?xVnd/usdRate:0;
-            html+=`<tr><td style="font-size:12px;">${fmtDate(d)}</td><td class="mono" style="font-size:12px;color:var(--tx3);">${x.n}</td><td class="mono" style="font-size:12px;">${fmtCur(x.native,a.currency)}</td><td class="mono" style="font-size:12px;font-weight:600;color:var(--green);">${xUsd>0?'$'+fmtNum(xUsd,2):'—'}</td></tr>`;
+            html+=`<tr><td style="font-size:12px;">${fmtDate(d)}</td><td class="mono" style="font-size:12px;color:var(--tx3);">${x.n}</td><td style="font-size:12px;">${fmtSpendDisplay(x.native,a.currency,a.exchange_rate)}</td></tr>`;
           });
           html+=`</tbody></table>`;
         }
@@ -665,17 +684,84 @@ function setRange(preset){
 
 async function editUsdRate(){
   const cur=parseFloat(settings.usd_to_vnd_rate)||26800;
-  const v=prompt('Tỉ giá USD → VNĐ chuẩn (dùng để quy đổi Chi tiêu USD):',cur);
+  const v=prompt('Tỉ giá USD → VNĐ chuẩn (để trống & OK để LẤY THEO THỊ TRƯỜNG):',cur);
   if(v===null)return;
+  if(!v.trim())return fetchLiveUsdRate(true);
   const n=parseFloat(String(v).replace(/[.,]/g,''))||parseFloat(v);
   if(!n||n<1000)return toast('Tỉ giá không hợp lệ','err');
   try{
-    const {error}=await sb.from('app_settings').upsert({key:'usd_to_vnd_rate',value:String(Math.round(n))},{onConflict:'key'});
-    if(error)throw error;
-    settings.usd_to_vnd_rate=String(Math.round(n));
+    await saveUsdRate(Math.round(n),'manual');
     toast('Đã lưu tỉ giá USD: '+fmtVnd(n)+'đ','ok');
     renderAccounts();
   }catch(e){toast('Lỗi: '+e.message,'err');}
+}
+
+async function saveUsdRate(rate,source){
+  const updatedAt=new Date().toISOString();
+  await sb.from('app_settings').upsert([
+    {key:'usd_to_vnd_rate',value:String(rate)},
+    {key:'usd_rate_updated_at',value:updatedAt},
+    {key:'usd_rate_source',value:source||'manual'}
+  ],{onConflict:'key'});
+  settings.usd_to_vnd_rate=String(rate);
+  settings.usd_rate_updated_at=updatedAt;
+  settings.usd_rate_source=source||'manual';
+}
+
+// VCB API qua CORS proxy → trả về tỉ giá Transfer (chuyển khoản) chuẩn nhất
+async function fetchVcbRate(){
+  const vcbUrl='https://www.vietcombank.com.vn/api/exchangerates?date='+todayStr();
+  const proxies=[
+    {name:'corsproxy.io',url:'https://corsproxy.io/?'+encodeURIComponent(vcbUrl)},
+    {name:'allorigins.win',url:'https://api.allorigins.win/raw?url='+encodeURIComponent(vcbUrl)}
+  ];
+  for(const p of proxies){
+    try{
+      const r=await fetch(p.url);
+      const d=await r.json();
+      const arr=d.Data||d.data||[];
+      const usd=arr.find(x=>(x.CurrencyCode||x.currencyCode)==='USD');
+      if(!usd)continue;
+      // Sell = VCB bán USD (cao nhất, sát thị trường) — Transfer thấp hơn ~200đ
+      const sellStr=usd.Sell||usd.sell||usd.Transfer||usd.transfer;
+      const rate=parseFloat(String(sellStr).replace(/[,\s]/g,''));
+      if(!rate||rate<1000)continue;
+      return {rate:Math.round(rate),source:'VCB Sell (qua '+p.name+')'};
+    }catch(e){continue;}
+  }
+  throw new Error('VCB không phản hồi');
+}
+
+async function fetchLiveUsdRate(showToast){
+  if(showToast)toast('Đang lấy tỉ giá VCB…','');
+  let rate,source;
+  // 1. Ưu tiên VCB
+  try{const v=await fetchVcbRate();rate=v.rate;source=v.source;}
+  catch(e){
+    // 2. Fallback: open.er-api.com
+    try{
+      const r=await fetch('https://open.er-api.com/v6/latest/USD');
+      const d=await r.json();
+      const vnd=d&&d.rates&&d.rates.VND;
+      if(!vnd||vnd<1000)throw new Error('API không trả VND');
+      rate=Math.round(vnd);source='open.er-api.com (VCB lỗi)';
+    }catch(e2){
+      if(showToast)toast('Lỗi lấy tỉ giá: '+e2.message,'err');
+      return;
+    }
+  }
+  await saveUsdRate(rate,source);
+  toast('Đã cập nhật: '+fmtVnd(rate)+'đ — '+source,'ok');
+  if(curPage===1)renderAccounts();
+  else if(curPage===2)renderAgencies();
+  return rate;
+}
+
+async function maybeAutoFetchRate(){
+  const upd=settings.usd_rate_updated_at;
+  if(!upd){await fetchLiveUsdRate(false);return;}
+  const ageHr=(Date.now()-new Date(upd).getTime())/3600000;
+  if(ageHr>24)await fetchLiveUsdRate(false);
 }
 
 async function updateExchangeRate(id,val){
