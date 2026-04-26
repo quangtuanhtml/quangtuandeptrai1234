@@ -493,7 +493,17 @@ function renderAccounts(){
       </tr></thead>
       <tbody>`;
   if(!adAccounts.length){
-    html+=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">💳</div><div class="empty-state-title">Chưa có TKQC</div><div class="empty-state-desc">Bấm "+ Thêm TKQC" để bắt đầu</div></div></td></tr>`;
+    const canDiscover=metaToken&&metaBusinessId;
+    html+=`<tr><td colspan="8"><div class="empty-state">
+      <div class="empty-state-icon">💳</div>
+      <div class="empty-state-title">Chưa có TKQC</div>
+      <div class="empty-state-desc">${canDiscover?'Tải tự động từ Business Manager hoặc thêm tay':'Cấu hình Meta token ở tab Admin để tải tự động, hoặc thêm tay'}</div>
+      <div style="margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        ${canDiscover?'<button class="btn btn-primary" onclick="discoverAccounts(\'owned\')">📥 Tải tự động từ BM</button>':''}
+        <button class="btn btn-ghost" onclick="openAccountForm()">+ Thêm tay</button>
+        ${!canDiscover?'<button class="btn btn-ghost" onclick="pg(6)">⚙ Đi đến Admin</button>':''}
+      </div>
+    </div></td></tr>`;
   }else{
     adAccounts.forEach(a=>{
       const balLow=(parseFloat(a.balance)||0)<10&&a.currency!=='VND';
@@ -1133,6 +1143,17 @@ function renderAdmin(){
     </div>
 
     <div class="card">
+      <h3>🔍 Auto Discover TKQC từ Business Manager</h3>
+      <p style="font-size:12px;color:var(--tx3);margin-bottom:12px;">Tự động tải toàn bộ TKQC trong BM (cả owned + client accounts) vào hệ thống. Dùng cho lần setup đầu — sau khi import xong, nhập tỷ giá VNĐ cho từng TK ở tab "Tài khoản QC".</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="discoverAccounts('owned')" ${metaToken&&metaBusinessId?'':'disabled title="Cần Meta token + Business ID"'}>📥 Tải TKQC owned (BM của bạn)</button>
+        <button class="btn btn-ghost" onclick="discoverAccounts('client')" ${metaToken&&metaBusinessId?'':'disabled'}>Tải TKQC client (được share)</button>
+        <button class="btn btn-ghost" onclick="discoverAccounts('me')" ${metaToken?'':'disabled title="Cần Meta token"'}>Tải qua /me/adaccounts</button>
+      </div>
+      <p style="font-size:11px;color:var(--tx-hint);margin-top:8px;">⚠ Token cần permission <code>ads_read</code> + <code>business_management</code>. Nếu lỗi 403, kiểm tra System User trong Business Settings có role với BM không.</p>
+    </div>
+
+    <div class="card">
       <h3>⚙️ Mặc định</h3>
       <div class="form-grid">
         <div class="form-group"><label>% phí mặc định</label><input id="s-fee" type="number" step="0.01" value="${esc(settings.default_fee_percent||65)}" /></div>
@@ -1195,6 +1216,68 @@ async function testMetaToken(){
     if(d.error)throw new Error(d.error.message);
     toast('OK — User: '+(d.name||d.id),'ok');
   }catch(e){toast('Lỗi: '+e.message,'err');}
+}
+
+// ─── Auto Discover TKQC từ Business Manager ───
+async function discoverAccounts(mode){
+  if(!metaToken)return toast('Cấu hình Meta token trước','err');
+  if((mode==='owned'||mode==='client')&&!metaBusinessId)return toast('Cần Business ID cho mode này','err');
+
+  const fields='id,name,account_id,currency,account_status,balance,amount_spent,spend_cap,timezone_name,business';
+  let endpoint;
+  if(mode==='owned')endpoint=`${metaBusinessId}/owned_ad_accounts`;
+  else if(mode==='client')endpoint=`${metaBusinessId}/client_ad_accounts`;
+  else endpoint='me/adaccounts';
+
+  toast('Đang tải danh sách TKQC...','');
+  try{
+    const statusMap={1:'ACTIVE',2:'DISABLED',3:'UNSETTLED',7:'PENDING_RISK_REVIEW',8:'PENDING_SETTLEMENT',9:'IN_GRACE_PERIOD',100:'PENDING_CLOSURE',101:'CLOSED'};
+    let url=`https://graph.facebook.com/v19.0/${endpoint}?fields=${encodeURIComponent(fields)}&limit=200&access_token=${encodeURIComponent(metaToken)}`;
+    let inserted=0,updated=0,skipped=0;
+    while(url){
+      const r=await fetch(url);
+      const d=await r.json();
+      if(d.error)throw new Error(d.error.message);
+      const accounts=d.data||[];
+      for(const a of accounts){
+        // Skip nếu currency không thuộc USD/EUR/VND (constraint của bảng)
+        const cur=(a.currency||'').toUpperCase();
+        if(!['USD','EUR','VND'].includes(cur)){skipped++;continue;}
+        // Meta trả "id" có dạng "act_xxx" rồi
+        const metaAccountId=a.id||('act_'+a.account_id);
+        const existing=adAccounts.find(x=>x.meta_account_id===metaAccountId);
+        const payload={
+          meta_account_id:metaAccountId,
+          name:a.name||metaAccountId,
+          currency:cur,
+          status:statusMap[a.account_status]||String(a.account_status||''),
+          balance:a.balance!=null?parseFloat(a.balance)/100:null,
+          amount_spent:a.amount_spent!=null?parseFloat(a.amount_spent)/100:0,
+          spend_cap:a.spend_cap!=null?parseFloat(a.spend_cap)/100:null,
+          business_id:(a.business&&a.business.id)||metaBusinessId||null
+        };
+        if(existing){
+          // Giữ lại exchange_rate đã nhập tay
+          await sb.from('ad_accounts').update(payload).eq('id',existing.id);
+          updated++;
+        }else{
+          payload.exchange_rate=cur==='VND'?1:0;
+          payload.is_active=true;
+          await sb.from('ad_accounts').insert(payload);
+          inserted++;
+        }
+      }
+      url=d.paging&&d.paging.next?d.paging.next:null;
+    }
+    const msg=`Đã import: ${inserted} mới · ${updated} cập nhật${skipped?' · '+skipped+' bỏ qua (currency lạ)':''}`;
+    toast(msg,'ok');
+    await loadAll();
+    if(curPage===1)renderAccounts();
+    else if(curPage===6)renderAdmin();
+  }catch(e){
+    console.error(e);
+    toast('Lỗi: '+e.message,'err');
+  }
 }
 
 async function recomputeAmounts(){
