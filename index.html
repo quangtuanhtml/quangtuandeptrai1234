@@ -684,34 +684,61 @@ function renderAgencies(){
         <option value="debt" ${agFilter==='debt'?'selected':''}>Đang nợ</option>
         <option value="over" ${agFilter==='over'?'selected':''}>Nợ vượt ngưỡng</option>
       </select>
-      <button class="btn btn-primary" onclick="openAgencyForm()">+ Thêm đại lý</button>
+      <button class="btn btn-primary" onclick="openAgencyForm()">+ Thêm khách hàng</button>
     </div>
 
     <div class="table-wrap"><div class="table-scroll"><table>
       <thead><tr>
-        <th>Mã</th><th>Tên</th><th class="hide-sm">SĐT/Zalo</th><th>% phí</th>
-        <th>Đã thanh toán</th><th>Công nợ</th><th>Ngưỡng (VNĐ)</th><th class="hide-sm">Loại</th><th></th>
+        <th style="width:40px;">STT</th>
+        <th>Tên Khách Hàng</th>
+        <th>Mã Camp</th>
+        <th title="Lấy tự động từ Meta API" style="background:#fff8c4;color:#7a5d00;">ID TKQC 🔒</th>
+        <th title="Tổng spend trong toàn kỳ — từ Meta API" style="background:#fff8c4;color:#7a5d00;">Tổng NS đã chạy 🔒</th>
+        <th>Tỉ giá chốt</th>
+        <th>Rate</th>
+        <th>Chốt tiền VNĐ</th>
+        <th>KH chuyển USDT</th>
+        <th>Tỉ giá mua USDT</th>
+        <th>Đã bank VNĐ</th>
+        <th>KH nợ</th>
+        <th></th>
       </tr></thead>
       <tbody>`;
   if(!list.length){
-    html+=`<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">🤝</div><div class="empty-state-title">Chưa có đại lý</div><div class="empty-state-desc">Bấm "+ Thêm đại lý" để bắt đầu</div></div></td></tr>`;
+    html+=`<tr><td colspan="13"><div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-title">Chưa có khách hàng</div><div class="empty-state-desc">Bấm "+ Thêm khách hàng" để bắt đầu</div></div></td></tr>`;
   }else{
-    list.forEach(a=>{
-      const d=debtMap[a.id]||{};
-      const unpaid=parseInt(d.unpaid_vnd)||0;
-      const threshold=parseInt(a.debt_threshold_vnd)||0;
-      const over=unpaid>=threshold&&unpaid>0;
+    // tổng spend per agency từ spend_daily (toàn kỳ)
+    const spendSum={};
+    spendDaily.forEach(s=>{
+      if(!s.agency_id)return;
+      if(!spendSum[s.agency_id])spendSum[s.agency_id]=0;
+      spendSum[s.agency_id]+=parseFloat(s.spend_native)||0;
+    });
+    list.forEach((a,idx)=>{
+      const acc=a.ad_account_id?adAccounts.find(x=>x.id===a.ad_account_id):null;
+      const accCur=acc?acc.currency:'USD';
+      const spend=spendSum[a.id]||0;
+      const billRate=parseFloat(a.billing_rate_vnd)||0;
+      const fee=parseFloat(a.fee_percent)||0;
+      const chotVnd=Math.round(spend*billRate*(fee/100));
+      const usdt=parseFloat(a.usdt_received)||0;
+      const usdtRate=parseFloat(a.usdt_buy_rate)||0;
+      const bankVnd=Math.round(usdt*usdtRate);
+      const debt=bankVnd-chotVnd;  // âm = khách còn nợ
       html+=`<tr>
-        <td><span class="badge b-blue mono">${esc(a.code)}</span></td>
+        <td class="mono" style="color:var(--tx3);">${idx+1}</td>
         <td><div style="font-weight:500;">${esc(a.name)}</div>${!a.is_active?'<span class="badge b-gray" style="font-size:10px;">Inactive</span>':''}</td>
-        <td class="hide-sm" style="font-size:12px;color:var(--tx3);">${esc(a.phone||'')}${a.zalo?' · '+esc(a.zalo):''}</td>
-        <td><input class="inline-input" type="number" step="0.01" min="0" max="100" value="${a.fee_percent}" onchange="updateAgencyFee(${a.id},this.value)" />%</td>
-        <td class="mono">${fmtVnd(d.total_paid_vnd||0)}</td>
-        <td class="mono" style="font-weight:600;${over?'color:var(--red);':unpaid>0?'color:var(--coral);':'color:var(--tx3);'}">${fmtVnd(unpaid)}${over?' ⚠️':''}</td>
-        <td class="mono" style="color:var(--tx3);font-size:12px;">${fmtVnd(threshold)}</td>
-        <td class="hide-sm"><span class="badge b-${a.payment_type==='prepaid'?'teal':'amber'}">${a.payment_type==='prepaid'?'Cọc trước':'Trả sau'}</span></td>
+        <td><span class="badge b-blue mono">${esc(a.code)}</span></td>
+        <td class="mono" style="font-size:12px;background:#fffceb;">${acc?esc(acc.meta_account_id):'<span style="color:var(--tx3);">— chưa link TKQC</span>'}</td>
+        <td class="mono" style="background:#fffceb;font-weight:600;">${spend>0?fmtNum(spend,2)+' '+accCur:'<span style="color:var(--tx3);font-weight:400;">—</span>'}</td>
+        <td><input class="inline-input" type="number" step="100" min="0" value="${billRate||''}" placeholder="26800" onchange="updateAgencyField(${a.id},'billing_rate_vnd',this.value)" style="width:90px;" /></td>
+        <td><input class="inline-input" type="number" step="0.01" min="0" max="1" value="${fee?(fee/100).toFixed(2):''}" placeholder="0.65" onchange="updateAgencyField(${a.id},'fee_percent',parseFloat(this.value)*100)" style="width:60px;" /></td>
+        <td class="mono" style="font-weight:600;">${chotVnd?fmtVnd(chotVnd):'<span style="color:var(--tx3);font-weight:400;">—</span>'}</td>
+        <td><input class="inline-input" type="number" step="1" min="0" value="${usdt||''}" placeholder="0" onchange="updateAgencyField(${a.id},'usdt_received',this.value)" style="width:80px;" /></td>
+        <td><input class="inline-input" type="number" step="100" min="0" value="${usdtRate||''}" placeholder="26700" onchange="updateAgencyField(${a.id},'usdt_buy_rate',this.value)" style="width:90px;" /></td>
+        <td class="mono">${bankVnd?fmtVnd(bankVnd):'<span style="color:var(--tx3);">—</span>'}</td>
+        <td class="mono" style="font-weight:600;color:${debt<0?'var(--red)':'var(--green)'};">${debt!==0?fmtVnd(debt):'<span style="color:var(--tx3);font-weight:400;">—</span>'}</td>
         <td>
-          <button class="btn btn-ghost btn-sm" onclick="openAgencyDetail(${a.id})">Chi tiết</button>
           <button class="btn btn-ghost btn-sm" onclick="openAgencyForm(${a.id})">Sửa</button>
         </td>
       </tr>`;
@@ -719,6 +746,18 @@ function renderAgencies(){
   }
   html+=`</tbody></table></div></div>`;
   document.getElementById('page').innerHTML=html;
+}
+
+async function updateAgencyField(id,field,val){
+  const v=val===''||val==null?null:parseFloat(val);
+  if(v!=null&&isNaN(v))return toast('Giá trị không hợp lệ','err');
+  try{
+    const {error}=await sb.from('agencies').update({[field]:v}).eq('id',id);
+    if(error)throw error;
+    const a=agencies.find(x=>x.id===id);if(a)a[field]=v;
+    toast('Đã lưu','ok');
+    renderAgencies();
+  }catch(e){toast('Lỗi: '+e.message,'err');}
 }
 
 async function updateAgencyFee(id,val){
@@ -737,11 +776,15 @@ function openAgencyForm(id){
   const isEdit=!!id;
   const body=`
     <div class="form-grid">
-      <div class="form-group"><label>Mã đại lý *</label><input id="f-code" value="${esc(a.code||'')}" placeholder="VVV" ${isEdit?'readonly':''} style="text-transform:uppercase;" /></div>
-      <div class="form-group"><label>Tên *</label><input id="f-name" value="${esc(a.name||'')}" placeholder="Tên đại lý" /></div>
+      <div class="form-group"><label>Mã Camp *</label><input id="f-code" value="${esc(a.code||'')}" placeholder="VVV" ${isEdit?'readonly':''} style="text-transform:uppercase;" /></div>
+      <div class="form-group"><label>Tên khách hàng *</label><input id="f-name" value="${esc(a.name||'')}" placeholder="VD: Hữu Đan" /></div>
+      <div class="form-group"><label>TKQC liên kết</label><select id="f-account"><option value="">— Chưa link —</option>${adAccounts.map(x=>`<option value="${x.id}" ${a.ad_account_id===x.id?'selected':''}>${esc(x.name)} (${esc(x.meta_account_id)}) · ${x.currency}</option>`).join('')}</select></div>
       <div class="form-group"><label>SĐT</label><input id="f-phone" value="${esc(a.phone||'')}" /></div>
       <div class="form-group"><label>Zalo</label><input id="f-zalo" value="${esc(a.zalo||'')}" /></div>
-      <div class="form-group"><label>% phí (65-70)</label><input id="f-fee" type="number" step="0.01" min="0" max="100" value="${a.fee_percent||settings.default_fee_percent||65}" /></div>
+      <div class="form-group"><label>Tỉ giá chốt tiền (USD/EUR → VNĐ)</label><input id="f-billrate" type="number" step="100" min="0" value="${a.billing_rate_vnd||''}" placeholder="VD: 26800" /></div>
+      <div class="form-group"><label>Rate / % phí (vd 0.65 = 65%)</label><input id="f-fee" type="number" step="0.01" min="0" max="100" value="${a.fee_percent||settings.default_fee_percent||65}" /></div>
+      <div class="form-group"><label>Khách đã chuyển USDT</label><input id="f-usdt" type="number" step="1" min="0" value="${a.usdt_received||''}" placeholder="0" /></div>
+      <div class="form-group"><label>Tỉ giá mua USDT (→ VNĐ)</label><input id="f-usdtrate" type="number" step="100" min="0" value="${a.usdt_buy_rate||''}" placeholder="VD: 26700" /></div>
       <div class="form-group"><label>Ngưỡng cảnh báo nợ (VNĐ)</label><input id="f-thresh" type="number" step="1000000" value="${a.debt_threshold_vnd||settings.default_debt_threshold||200000000}" /></div>
       <div class="form-group"><label>Loại thanh toán</label><select id="f-pay"><option value="postpaid" ${a.payment_type!=='prepaid'?'selected':''}>Trả sau (khách quen)</option><option value="prepaid" ${a.payment_type==='prepaid'?'selected':''}>Cọc trước (khách mới)</option></select></div>
       <div class="form-group"><label>Active</label><select id="f-active"><option value="true" ${a.is_active!==false?'selected':''}>Có</option><option value="false" ${a.is_active===false?'selected':''}>Không</option></select></div>
@@ -758,12 +801,17 @@ function openAgencyForm(id){
 }
 
 async function saveAgency(id){
+  const accVal=document.getElementById('f-account').value;
   const data={
     code:document.getElementById('f-code').value.trim().toUpperCase(),
     name:document.getElementById('f-name').value.trim(),
     phone:document.getElementById('f-phone').value.trim()||null,
     zalo:document.getElementById('f-zalo').value.trim()||null,
     fee_percent:parseFloat(document.getElementById('f-fee').value)||65,
+    ad_account_id:accVal?parseInt(accVal):null,
+    billing_rate_vnd:parseFloat(document.getElementById('f-billrate').value)||null,
+    usdt_received:parseFloat(document.getElementById('f-usdt').value)||0,
+    usdt_buy_rate:parseFloat(document.getElementById('f-usdtrate').value)||null,
     debt_threshold_vnd:parseInt(document.getElementById('f-thresh').value)||0,
     payment_type:document.getElementById('f-pay').value,
     is_active:document.getElementById('f-active').value==='true',
