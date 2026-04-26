@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Quang Tuấn — Cho thuê TKQC Facebook</title>
+<meta name="theme-color" content="#2563EB">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg1:#fff;--bg2:#f8fafc;--bg3:#f2f5fa;
+  --tx1:#0f172a;--tx2:#475569;--tx3:#64748b;--tx-hint:#94a3b8;
+  --bd1:rgba(15,23,42,.08);--bd2:rgba(15,23,42,.14);
+  --green:#059669;--green-bg:#ecfdf5;--green-tx:#047857;
+  --red:#dc2626;--red-bg:#fef2f2;--red-tx:#b91c1c;
+  --amber:#d97706;--amber-bg:#fff7ed;--amber-tx:#b45309;
+  --blue:#2563eb;--blue-bg:#eff6ff;--blue-tx:#1d4ed8;
+  --purple:#5b4ce6;--purple-bg:#f3f0ff;--purple-tx:#4338ca;
+  --coral:#ea580c;--coral-bg:#fff7ed;--coral-tx:#c2410c;
+  --pink:#db2777;--pink-bg:#fdf2f8;--pink-tx:#be185d;
+  --teal:#0f766e;--teal-bg:#ecfeff;--teal-tx:#0f766e;
+  --gray:#64748b;--gray-bg:#f1f5f9;--gray-tx:#475569;
+  --radius:12px;--radius-lg:18px;
+  --shadow-sm:0 8px 24px rgba(15,23,42,.06);
+  --shadow-md:0 16px 40px rgba(15,23,42,.08);
+  --shadow-lg:0 14px 32px rgba(15,23,42,.12);
+}
+html[data-theme="dark"]{
+  --bg1:#0f172a;--bg2:#1e293b;--bg3:#0b1220;
+  --tx1:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;
+  --bd1:rgba(255,255,255,.08);--bd2:rgba(255,255,255,.14);
+  --blue-bg:rgba(37,99,235,.18);--green-bg:rgba(5,150,105,.18);
+  --red-bg:rgba(220,38,38,.18);--amber-bg:rgba(217,119,6,.18);
+  --purple-bg:rgba(91,76,230,.18);--coral-bg:rgba(234,88,12,.18);
+  --teal-bg:rgba(15,118,110,.18);--gray-bg:rgba(100,116,139,.18);
+  --shadow-sm:0 8px 24px rgba(0,0,0,.35);
+}
+html[data-theme="dark"] body{background:linear-gradient(180deg,#0b1220 0,#0f172a 100%);}
+html[data-theme="dark"] .sidebar,html[data-theme="dark"] .mobile-header{background:rgba(15,23,42,.88);}
+html[data-theme="dark"] th{background:rgba(30,41,59,.96);color:var(--tx1);}
+html[data-theme="dark"] tr:hover td{background:var(--bg3);}
+html[data-theme="dark"] input,html[data-theme="dark"] select,html[data-theme="dark"] textarea{background:var(--bg2);color:var(--tx1);border-color:var(--bd2);}
+html[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.85);cursor:pointer;}
+
+html{scroll-behavior:smooth;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(180deg,#f7f9fc 0,#f2f5fa 100%);color:var(--tx1);min-height:100vh;line-height:1.45;-webkit-font-smoothing:antialiased;}
+.app{display:grid;grid-template-columns:200px 1fr;min-height:100vh;}
+@media(max-width:768px){.app{grid-template-columns:1fr;}.sidebar{display:none;position:fixed;z-index:100;width:240px;}.sidebar.open{display:block;box-shadow:4px 0 20px rgba(0,0,0,.2);}}
+
+.sidebar{background:rgba(255,255,255,.88);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-right:1px solid rgba(15,23,42,.06);padding:14px 0;position:sticky;top:0;height:100vh;overflow-y:auto;}
+.logo{padding:10px 22px 16px;border-bottom:1px solid var(--bd1);margin-bottom:10px;}
+.logo h1{font-size:18px;font-weight:600;letter-spacing:-.02em;}
+.logo span{font-size:11px;color:var(--tx2);}
+.logo .live{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-left:4px;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.nav-item{display:flex;align-items:center;gap:10px;margin:2px 12px;padding:10px 14px;font-size:13px;color:var(--tx2);cursor:pointer;border-radius:10px;font-weight:500;transition:all .15s;}
+.nav-item:hover{background:rgba(37,99,235,.06);color:var(--tx1);}
+.nav-item.active{background:var(--blue-bg);color:var(--blue-tx);}
+.nav-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;padding:1px 6px;border-radius:9px;font-weight:600;display:none;}
+.nav-badge.show{display:inline-block;}
+.nav-sep{height:1px;background:var(--bd1);margin:8px 22px;}
+.nav-label{padding:8px 22px 4px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--tx3);font-weight:600;}
+
+.mobile-header{display:none;padding:12px 16px;background:rgba(255,255,255,.88);backdrop-filter:blur(18px);border-bottom:1px solid var(--bd1);position:sticky;top:0;z-index:50;align-items:center;gap:12px;}
+@media(max-width:768px){.mobile-header{display:flex;}}
+.hamburger{width:28px;height:28px;display:flex;flex-direction:column;justify-content:center;gap:4px;cursor:pointer;background:none;border:none;padding:4px;}
+.hamburger span{display:block;width:100%;height:2px;background:var(--tx1);border-radius:1px;}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99;}
+.overlay.show{display:block;}
+
+.main{padding:24px 28px;overflow-y:auto;}
+@media(max-width:768px){.main{padding:16px;}}
+.page-title{font-size:22px;font-weight:600;margin-bottom:4px;letter-spacing:-.02em;}
+.page-sub{font-size:13px;color:var(--tx3);margin-bottom:18px;}
+
+.kpi-grid{display:grid;gap:10px;margin-bottom:18px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));}
+.kpi{background:var(--bg1);border:1px solid var(--bd1);border-radius:var(--radius);padding:14px 16px;}
+.kpi-label{font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.3px;font-weight:600;}
+.kpi-value{font-size:22px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums;}
+.kpi-note{font-size:11px;color:var(--tx3);margin-top:2px;}
+.kpi-value.red{color:var(--red);}
+.kpi-value.green{color:var(--green);}
+.kpi-value.amber{color:var(--amber);}
+
+.section-title{font-size:14px;font-weight:600;margin:20px 0 8px;display:flex;align-items:center;gap:8px;}
+.section-title .count{font-size:11px;font-weight:500;color:var(--tx3);background:var(--bg3);padding:2px 8px;border-radius:8px;}
+
+.card{background:var(--bg1);border:1px solid var(--bd1);border-radius:var(--radius-lg);padding:18px;margin-bottom:14px;}
+.card h3{font-size:14px;font-weight:600;margin-bottom:12px;}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center;}
+.toolbar input,.toolbar select{padding:8px 12px;border:1px solid var(--bd2);border-radius:var(--radius);background:var(--bg1);color:var(--tx1);font-size:13px;outline:none;font-family:inherit;}
+.toolbar input:focus,.toolbar select:focus{border-color:var(--blue);}
+.toolbar .grow{flex:1;min-width:200px;}
+
+.table-wrap{background:var(--bg1);border:1px solid var(--bd1);border-radius:var(--radius-lg);overflow:hidden;}
+.table-scroll{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;min-width:560px;}
+th{text-align:left;padding:11px 14px;font-size:11px;font-weight:700;color:var(--tx2);background:var(--bg2);border-bottom:1px solid var(--bd1);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;}
+td{padding:10px 14px;border-bottom:1px solid var(--bd1);font-size:13px;color:var(--tx1);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--bg2);}
+.mono{font-variant-numeric:tabular-nums;letter-spacing:-.01em;}
+
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;white-space:nowrap;}
+.b-green{background:var(--green-bg);color:var(--green-tx);}
+.b-red{background:var(--red-bg);color:var(--red-tx);}
+.b-amber{background:var(--amber-bg);color:var(--amber-tx);}
+.b-blue{background:var(--blue-bg);color:var(--blue-tx);}
+.b-purple{background:var(--purple-bg);color:var(--purple-tx);}
+.b-coral{background:var(--coral-bg);color:var(--coral-tx);}
+.b-teal{background:var(--teal-bg);color:var(--teal-tx);}
+.b-gray{background:var(--gray-bg);color:var(--gray-tx);}
+
+.btn{padding:8px 14px;border:none;border-radius:var(--radius);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;font-family:inherit;display:inline-flex;align-items:center;gap:6px;}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn:active:not(:disabled){transform:scale(.97);}
+.btn-primary{background:var(--blue);color:#fff;}
+.btn-primary:hover:not(:disabled){background:#1d4ed8;}
+.btn-green{background:var(--green);color:#fff;}
+.btn-green:hover:not(:disabled){background:#047857;}
+.btn-red{background:var(--red);color:#fff;}
+.btn-red:hover:not(:disabled){background:#b91c1c;}
+.btn-ghost{background:transparent;color:var(--tx2);border:1px solid var(--bd2);}
+.btn-ghost:hover{background:var(--bg2);color:var(--tx1);}
+.btn-sm{padding:5px 10px;font-size:12px;}
+
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px;}
+.form-group{display:flex;flex-direction:column;gap:4px;}
+.form-group label{font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.3px;font-weight:600;}
+.form-group input,.form-group select,.form-group textarea{padding:9px 11px;border:1px solid var(--bd2);border-radius:var(--radius);background:var(--bg1);color:var(--tx1);font-size:13px;outline:none;font-family:inherit;transition:border .15s;}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.15);}
+.form-group textarea{resize:vertical;min-height:60px;}
+
+.inline-input{padding:5px 8px;border:1px solid var(--bd2);border-radius:6px;background:var(--bg1);color:var(--tx1);font-size:12px;width:90px;font-family:inherit;font-variant-numeric:tabular-nums;outline:none;}
+.inline-input:focus{border-color:var(--blue);}
+
+.empty-state{text-align:center;padding:40px 20px;background:var(--bg2);border-radius:var(--radius-lg);color:var(--tx3);}
+.empty-state-icon{font-size:36px;margin-bottom:10px;opacity:.6;}
+.empty-state-title{font-size:14px;font-weight:500;color:var(--tx1);margin-bottom:6px;}
+.empty-state-desc{font-size:12px;}
+
+.loading{text-align:center;padding:40px;color:var(--tx3);font-size:14px;}
+.loading::after{content:'';display:inline-block;width:14px;height:14px;border:2px solid var(--bd2);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite;margin-left:8px;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.5);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-bg.show{display:flex;}
+.modal{background:var(--bg1);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);max-width:560px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--bd1);display:flex;align-items:center;justify-content:space-between;}
+.modal-head h3{font-size:16px;font-weight:600;}
+.modal-close{width:32px;height:32px;border:none;background:transparent;color:var(--tx3);font-size:20px;cursor:pointer;border-radius:8px;}
+.modal-close:hover{background:var(--bg2);color:var(--tx1);}
+.modal-body{padding:20px;overflow-y:auto;flex:1;}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--bd1);display:flex;gap:8px;justify-content:flex-end;background:var(--bg2);}
+html[data-theme="dark"] .modal{background:var(--bg2);}
+html[data-theme="dark"] .modal-foot{background:var(--bg3);}
+
+/* Toast */
+#toast-container{position:fixed;top:20px;right:20px;z-index:300;display:flex;flex-direction:column;gap:8px;max-width:340px;}
+.toast{background:var(--bg1);border:1px solid var(--bd1);border-left:4px solid var(--blue);border-radius:var(--radius);padding:12px 14px;font-size:13px;box-shadow:var(--shadow-md);animation:slideIn .25s ease;}
+.toast.ok{border-left-color:var(--green);}
+.toast.err{border-left-color:var(--red);}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* Sub-tabs */
+.sub-tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:14px;}
+.sub-tab{padding:7px 14px;font-size:13px;cursor:pointer;border-radius:var(--radius);border:1px solid var(--bd2);background:var(--bg1);color:var(--tx2);font-family:inherit;}
+.sub-tab:hover{background:var(--bg2);}
+.sub-tab.active{background:var(--blue-bg);color:var(--blue-tx);border-color:var(--blue);font-weight:500;}
+
+/* Theme toggle FAB */
+.theme-fab{position:fixed;bottom:20px;right:20px;width:42px;height:42px;border-radius:50%;background:var(--bg1);border:1px solid var(--bd1);box-shadow:var(--shadow-md);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tx2);z-index:90;}
+.theme-fab:hover{color:var(--tx1);}
+html[data-theme="dark"] .theme-icon-moon{display:none;}
+html[data-theme="light"] .theme-icon-sun,html:not([data-theme="dark"]) .theme-icon-sun{display:none;}
+
+/* Status badge map */
+.s-active{background:var(--green-bg);color:var(--green-tx);}
+.s-disabled,.s-closed{background:var(--red-bg);color:var(--red-tx);}
+.s-paused,.s-pending{background:var(--amber-bg);color:var(--amber-tx);}
+.s-grace,.s-unsettled{background:var(--coral-bg);color:var(--coral-tx);}
+
+/* Responsive table → cards on mobile */
+@media(max-width:600px){
+  .hide-sm{display:none;}
+}
+</style>
+</head>
+<body>
+<div class="mobile-header">
+  <button class="hamburger" onclick="toggleSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
+  <span style="font-weight:600;font-size:15px;">Quang Tuấn</span>
+</div>
+<div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">
+      <h1>Quang Tuấn <span class="live"></span></h1>
+      <span>Cho thuê TKQC Facebook</span>
+    </div>
+    <div class="nav-item active" data-page="0" onclick="pg(0)"><div class="nav-dot" style="background:var(--purple)"></div>Tổng quan</div>
+    <div class="nav-item" data-page="1" onclick="pg(1)"><div class="nav-dot" style="background:var(--teal)"></div>Tài khoản QC</div>
+    <div class="nav-item" data-page="2" onclick="pg(2)"><div class="nav-dot" style="background:var(--blue)"></div>Đại lý</div>
+    <div class="nav-item" data-page="3" onclick="pg(3)"><div class="nav-dot" style="background:var(--green)"></div>Chi tiêu</div>
+    <div class="nav-item" data-page="4" onclick="pg(4)"><div class="nav-dot" style="background:var(--coral)"></div>Thanh toán</div>
+    <div class="nav-item" data-page="5" onclick="pg(5)"><div class="nav-dot" style="background:var(--red)"></div>Cảnh báo<span class="nav-badge" id="nav-alert-count">0</span></div>
+    <div class="nav-sep"></div>
+    <div class="nav-label">Quản lý</div>
+    <div class="nav-item" data-page="6" onclick="pg(6)"><div class="nav-dot" style="background:var(--amber)"></div>Admin</div>
+  </aside>
+  <main class="main" id="page"><div class="loading">Đang tải</div></main>
+</div>
+
+<button class="theme-fab" onclick="toggleTheme()" title="Đổi theme">
+  <svg class="theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <svg class="theme-icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke-linecap="round"/></svg>
+</button>
+
+<div id="toast-container"></div>
+
+<!-- Modal generic -->
+<div class="modal-bg" id="modal-bg" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal">
+    <div class="modal-head"><h3 id="modal-title">Modal</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-foot" id="modal-foot"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// QUANG TUẤN — Cho thuê TKQC Facebook
+// ═══════════════════════════════════════════════════════════════
+const SB_URL='https://pdysseecmxunxsyrohye.supabase.co';
+const SB_KEY='sb_publishable_f8LkIfLg5CSTiyn2tnENTg_ckQWZMix';
+const sb=supabase.createClient(SB_URL,SB_KEY);
+
+// ─── State ───
+let curPage=0;
+let adAccounts=[],agencies=[],spendDaily=[],payments=[],policyAlerts=[],settings={};
+let agencyDebt=[]; // computed from view v_agency_debt
+let metaToken='',metaBusinessId='',codePattern='^([A-Z0-9]+)-';
+let filterDateFrom='',filterDateTo='',filterAgencyId='',filterAccountId='';
+let isLoading=false;
+
+// ─── Helpers ───
+function esc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtVnd(n){n=Math.round(parseFloat(n)||0);return n.toLocaleString('en-US').replace(/,/g,'.');}
+function fmtNum(n,d){d=d==null?2:d;return (parseFloat(n)||0).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});}
+function fmtCur(n,cur){const v=fmtNum(n,cur==='VND'?0:2);return v+' '+(cur||'');}
+function fmtDate(d){if(!d)return'';const dt=typeof d==='string'?new Date(d):d;return dt.toLocaleDateString('vi-VN');}
+function todayStr(){return new Date().toISOString().slice(0,10);}
+function monthAgo(){const d=new Date();d.setDate(d.getDate()-30);return d.toISOString().slice(0,10);}
+
+function toast(msg,type){
+  const c=document.getElementById('toast-container');
+  const t=document.createElement('div');
+  t.className='toast '+(type||'');
+  t.textContent=msg;
+  c.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},3500);
+}
+
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('show');
+}
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute('data-theme');
+  const next=cur==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  localStorage.setItem('qt-theme',next);
+}
+(function initTheme(){
+  const saved=localStorage.getItem('qt-theme');
+  if(saved)document.documentElement.setAttribute('data-theme',saved);
+})();
+
+// ─── Modal ───
+function openModal(title,bodyHtml,footHtml){
+  document.getElementById('modal-title').textContent=title;
+  document.getElementById('modal-body').innerHTML=bodyHtml;
+  document.getElementById('modal-foot').innerHTML=footHtml||'<button class="btn btn-ghost" onclick="closeModal()">Đóng</button>';
+  document.getElementById('modal-bg').classList.add('show');
+}
+function closeModal(){document.getElementById('modal-bg').classList.remove('show');}
+
+// ─── Status badge ───
+function statusBadge(s){
+  if(!s)return'<span class="badge b-gray">—</span>';
+  const map={
+    'ACTIVE':'b-green','PAUSED':'b-amber','DISABLED':'b-red','CLOSED':'b-red',
+    'UNSETTLED':'b-coral','PENDING_RISK_REVIEW':'b-amber','PENDING_SETTLEMENT':'b-coral',
+    'IN_GRACE_PERIOD':'b-amber','PENDING_CLOSURE':'b-red','ARCHIVED':'b-gray',
+    'DISAPPROVED':'b-red','PENDING_REVIEW':'b-amber','REJECTED':'b-red'
+  };
+  const cls=map[s]||'b-gray';
+  return'<span class="badge '+cls+'">'+esc(s)+'</span>';
+}
+
+// ─── Detect agency_code from campaign_name ───
+function detectAgencyCode(name){
+  if(!name)return null;
+  try{
+    const re=new RegExp(codePattern);
+    const m=name.match(re);
+    return m&&m[1]?m[1].toUpperCase():null;
+  }catch(e){return null;}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOAD DATA
+// ═══════════════════════════════════════════════════════════════
+async function loadAll(){
+  isLoading=true;
+  try{
+    const [r1,r2,r3,r4,r5,r6,r7]=await Promise.all([
+      sb.from('ad_accounts').select('*').order('id'),
+      sb.from('agencies').select('*').order('code'),
+      sb.from('spend_daily').select('*').gte('date',monthAgo()).order('date',{ascending:false}).limit(2000),
+      sb.from('payments').select('*').order('paid_at',{ascending:false}).limit(500),
+      sb.from('policy_alerts').select('*').order('detected_at',{ascending:false}).limit(200),
+      sb.from('app_settings').select('*'),
+      sb.from('v_agency_debt').select('*')
+    ]);
+    if(r1.error)throw r1.error;
+    if(r2.error)throw r2.error;
+    if(r3.error)throw r3.error;
+    if(r4.error)throw r4.error;
+    if(r5.error)throw r5.error;
+    if(r6.error)throw r6.error;
+    if(r7.error)throw r7.error;
+    adAccounts=r1.data||[];
+    agencies=r2.data||[];
+    spendDaily=r3.data||[];
+    payments=r4.data||[];
+    policyAlerts=r5.data||[];
+    agencyDebt=r7.data||[];
+    settings={};
+    (r6.data||[]).forEach(s=>settings[s.key]=s.value);
+    metaToken=settings.meta_access_token||'';
+    metaBusinessId=settings.meta_business_id||'';
+    codePattern=settings.agency_code_pattern||'^([A-Z0-9]+)-';
+    updateAlertBadge();
+  }catch(e){
+    console.error(e);
+    toast('Lỗi tải dữ liệu: '+(e.message||e),'err');
+  }finally{
+    isLoading=false;
+  }
+}
+
+function updateAlertBadge(){
+  const debtAlerts=agencyDebt.filter(a=>(a.unpaid_vnd||0)>=(a.debt_threshold_vnd||0)&&(a.unpaid_vnd||0)>0).length;
+  const policyOpen=policyAlerts.filter(p=>!p.is_resolved).length;
+  const orphans=spendDaily.filter(s=>s.is_orphan).length;
+  const total=debtAlerts+policyOpen+(orphans>0?1:0);
+  const el=document.getElementById('nav-alert-count');
+  el.textContent=total;
+  el.classList.toggle('show',total>0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAGE ROUTER
+// ═══════════════════════════════════════════════════════════════
+async function pg(n){
+  curPage=n;
+  document.querySelectorAll('.nav-item').forEach(el=>{
+    el.classList.toggle('active',el.dataset.page==String(n));
+  });
+  if(window.innerWidth<=768){
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('overlay').classList.remove('show');
+  }
+  document.getElementById('page').innerHTML='<div class="loading">Đang tải</div>';
+  await loadAll();
+  const renders=[renderOverview,renderAccounts,renderAgencies,renderSpend,renderPayments,renderAlerts,renderAdmin];
+  renders[n]();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAGE 0: TỔNG QUAN
+// ═══════════════════════════════════════════════════════════════
+function renderOverview(){
+  const today=todayStr();
+  const todaySpend=spendDaily.filter(s=>s.date===today);
+  const monthSpend=spendDaily;
+  const sumByCur=(rows)=>{
+    const m={USD:0,EUR:0,VND:0};
+    rows.forEach(s=>{m[s.currency]=(m[s.currency]||0)+(parseFloat(s.spend_native)||0);});
+    return m;
+  };
+  const todayCur=sumByCur(todaySpend);
+  const monthCur=sumByCur(monthSpend);
+  const todayVnd=todaySpend.reduce((a,s)=>a+(parseInt(s.amount_vnd)||0),0);
+  const monthVnd=monthSpend.reduce((a,s)=>a+(parseInt(s.amount_vnd)||0),0);
+  const totalDebt=agencyDebt.reduce((a,d)=>a+(parseInt(d.unpaid_vnd)||0),0);
+  const activeAccounts=adAccounts.filter(a=>a.is_active).length;
+  const activeAgencies=agencies.filter(a=>a.is_active).length;
+  const debtOver=agencyDebt.filter(a=>(a.unpaid_vnd||0)>=(a.debt_threshold_vnd||0)&&(a.unpaid_vnd||0)>0).length;
+  const policyOpen=policyAlerts.filter(p=>!p.is_resolved).length;
+  const orphans=spendDaily.filter(s=>s.is_orphan).length;
+
+  const fmtCurLine=(m)=>{
+    const parts=[];
+    if(m.USD)parts.push(fmtNum(m.USD,2)+' USD');
+    if(m.EUR)parts.push(fmtNum(m.EUR,2)+' EUR');
+    if(m.VND)parts.push(fmtVnd(m.VND)+' VND');
+    return parts.join(' · ')||'—';
+  };
+
+  // Top 5 đại lý theo công nợ
+  const topDebt=agencyDebt.slice().sort((a,b)=>(b.unpaid_vnd||0)-(a.unpaid_vnd||0)).slice(0,5);
+
+  let html=`
+    <h1 class="page-title">Tổng quan</h1>
+    <p class="page-sub">Cập nhật: ${fmtDate(new Date())} · ${activeAccounts} TKQC active · ${activeAgencies} đại lý</p>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Chi tiêu hôm nay</div><div class="kpi-value">${fmtVnd(todayVnd)}<span style="font-size:13px;color:var(--tx3);"> VNĐ</span></div><div class="kpi-note">${fmtCurLine(todayCur)}</div></div>
+      <div class="kpi"><div class="kpi-label">Chi tiêu 30 ngày</div><div class="kpi-value">${fmtVnd(monthVnd)}<span style="font-size:13px;color:var(--tx3);"> VNĐ</span></div><div class="kpi-note">${fmtCurLine(monthCur)}</div></div>
+      <div class="kpi"><div class="kpi-label">Tổng công nợ</div><div class="kpi-value ${totalDebt>0?'red':''}">${fmtVnd(totalDebt)}<span style="font-size:13px;color:var(--tx3);"> VNĐ</span></div><div class="kpi-note">${agencyDebt.filter(d=>(d.unpaid_vnd||0)>0).length} đại lý đang nợ</div></div>
+      <div class="kpi"><div class="kpi-label">Cảnh báo</div><div class="kpi-value ${(debtOver+policyOpen)>0?'red':''}">${debtOver+policyOpen+(orphans>0?1:0)}</div><div class="kpi-note">${debtOver} nợ vượt · ${policyOpen} vi phạm · ${orphans} sai mã</div></div>
+    </div>
+
+    <div class="section-title">Top đại lý theo công nợ <span class="count">${topDebt.length}</span></div>
+    <div class="table-wrap"><div class="table-scroll"><table>
+      <thead><tr><th>Mã</th><th>Tên</th><th class="hide-sm">% phí</th><th>Đã thanh toán</th><th>Công nợ</th><th>Ngưỡng</th><th></th></tr></thead>
+      <tbody>`;
+  if(!topDebt.length){
+    html+=`<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">💼</div><div class="empty-state-title">Chưa có đại lý nào</div><div class="empty-state-desc">Vào tab Đại lý để thêm mới</div></div></td></tr>`;
+  }else{
+    topDebt.forEach(d=>{
+      const over=(d.unpaid_vnd||0)>=(d.debt_threshold_vnd||0)&&(d.unpaid_vnd||0)>0;
+      html+=`<tr>
+        <td><span class="badge b-blue">${esc(d.agency_code)}</span></td>
+        <td>${esc(d.agency_name)}</td>
+        <td class="hide-sm mono">${fmtNum(d.fee_percent,2)}%</td>
+        <td class="mono">${fmtVnd(d.total_paid_vnd)}</td>
+        <td class="mono" style="font-weight:600;${over?'color:var(--red);':''}">${fmtVnd(d.unpaid_vnd)}</td>
+        <td class="mono" style="color:var(--tx3);">${fmtVnd(d.debt_threshold_vnd)}</td>
+        <td>${over?'<span class="badge b-red">Vượt ngưỡng</span>':''}</td>
+      </tr>`;
+    });
+  }
+  html+=`</tbody></table></div></div>
+
+    <div class="section-title">Cảnh báo gần nhất <span class="count">${policyAlerts.filter(p=>!p.is_resolved).length}</span></div>
+    <div class="table-wrap"><div class="table-scroll"><table>
+      <thead><tr><th>Loại</th><th>Campaign</th><th>Đại lý</th><th>Phát hiện</th></tr></thead>
+      <tbody>`;
+  const recentAlerts=policyAlerts.filter(p=>!p.is_resolved).slice(0,8);
+  if(!recentAlerts.length){
+    html+=`<tr><td colspan="4"><div class="empty-state"><div class="empty-state-icon">✓</div><div class="empty-state-title">Không có cảnh báo</div><div class="empty-state-desc">Mọi campaign đang chạy bình thường</div></div></td></tr>`;
+  }else{
+    recentAlerts.forEach(a=>{
+      html+=`<tr>
+        <td>${statusBadge(a.issue_type)}</td>
+        <td><div style="font-weight:500;">${esc(a.campaign_name||a.campaign_id)}</div><div style="font-size:11px;color:var(--tx3);">${esc(a.issue_detail||'')}</div></td>
+        <td>${a.agency_code?'<span class="badge b-blue">'+esc(a.agency_code)+'</span>':'<span class="badge b-gray">—</span>'}</td>
+        <td style="color:var(--tx3);font-size:12px;">${fmtDate(a.detected_at)}</td>
+      </tr>`;
+    });
+  }
+  html+=`</tbody></table></div></div>`;
+  document.getElementById('page').innerHTML=html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAGE 1: TÀI KHOẢN QUẢNG CÁO
+// ═══════════════════════════════════════════════════════════════
+function renderAccounts(){
+  let html=`
+    <h1 class="page-title">Tài khoản quảng cáo</h1>
+    <p class="page-sub">Quản lý ${adAccounts.length} TKQC · Tỷ giá nhập tay theo từng tài khoản</p>
+
+    <div class="toolbar">
+      <button class="btn btn-primary" onclick="openAccountForm()">+ Thêm TKQC</button>
+      <button class="btn btn-green" onclick="syncMeta()" ${metaToken?'':'disabled title="Cấu hình Meta token ở tab Admin trước"'}>⟳ Sync Meta API</button>
+      <div style="margin-left:auto;font-size:12px;color:var(--tx3);">Tổng balance: ${adAccounts.reduce((a,b)=>a+(parseFloat(b.balance)||0),0).toFixed(2)}</div>
+    </div>
+
+    <div class="table-wrap"><div class="table-scroll"><table>
+      <thead><tr>
+        <th>Tên</th><th>ID</th><th>Tiền tệ</th><th>Tỷ giá VNĐ</th>
+        <th>Đã tiêu</th><th>Số dư</th><th>Trạng thái</th><th></th>
+      </tr></thead>
+      <tbody>`;
+  if(!adAccounts.length){
+    html+=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">💳</div><div class="empty-state-title">Chưa có TKQC</div><div class="empty-state-desc">Bấm "+ Thêm TKQC" để bắt đầu</div></div></td></tr>`;
+  }else{
+    adAccounts.forEach(a=>{
+      const balLow=(parseFloat(a.balance)||0)<10&&a.currency!=='VND';
+      html+=`<tr>
+        <td><div style="font-weight:500;">${esc(a.name)}</div><div style="font-size:11px;color:var(--tx3);">${a.is_active?'Active':'<span style="color:var(--red);">Inactive</span>'}</div></td>
+        <td class="mono" style="font-size:12px;color:var(--tx3);">${esc(a.meta_account_id)}</td>
+        <td><span class="badge b-${a.currency==='USD'?'green':(a.currency==='EUR'?'amber':'blue')}">${esc(a.currency)}</span></td>
+        <td><input class="inline-input" type="number" step="0.0001" value="${a.exchange_rate||0}" onchange="updateExchangeRate(${a.id},this.value)" /></td>
+        <td class="mono">${fmtCur(a.amount_spent,a.currency)}</td>
+        <td class="mono ${balLow?'':''}" style="${balLow?'color:var(--red);font-weight:600;':''}">${fmtCur(a.balance,a.currency)}</td>
+        <td>${statusBadge(a.status)}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="openAccountForm(${a.id})">Sửa</button></td>
+      </tr>`;
+    });
+  }
+  html+=`</tbody></table></div></div>`;
+  document.getElementById('page').innerHTML=html;
+}
+
+async function updateExchangeRate(id,val){
+  const v=parseFloat(val)||0;
+  if(v<0)return toast('Tỷ giá phải >= 0','err');
+  try{
+    const {error}=await sb.from('ad_accounts').update({exchange_rate:v}).eq('id',id);
+    if(error)throw error;
+    const a=adAccounts.find(x=>x.id===id);if(a)a.exchange_rate=v;
+    toast('Đã lưu tỷ giá','ok');
+  }catch(e){toast('Lỗi: '+e.message,'err');}
+}
+
+function openAccountForm(id){
+  const a=id?adAccounts.find(x=>x.id===id):{};
+  const isEdit=!!id;
+  const body=`
+    <div class="form-grid">
+      <div class="form-group"><label>Tên hiển thị *</label><input id="f-name" value="${esc(a.name||'')}" placeholder="VD: TKQC Main USD" /></div>
+      <div class="form-group"><label>Meta Account ID *</label><input id="f-mid" value="${esc(a.meta_account_id||'')}" placeholder="act_xxxxxxx" ${isEdit?'readonly':''} /></div>
+      <div class="form-group"><label>Tiền tệ *</label><select id="f-cur"><option ${a.currency==='USD'?'selected':''}>USD</option><option ${a.currency==='EUR'?'selected':''}>EUR</option><option ${a.currency==='VND'?'selected':''}>VND</option></select></div>
+      <div class="form-group"><label>Tỷ giá → VNĐ</label><input id="f-rate" type="number" step="0.0001" value="${a.exchange_rate||''}" placeholder="VD: 26800" /></div>
+      <div class="form-group"><label>Trạng thái</label><input id="f-status" value="${esc(a.status||'ACTIVE')}" /></div>
+      <div class="form-group"><label>Spend cap (native)</label><input id="f-cap" type="number" step="0.01" value="${a.spend_cap||''}" /></div>
+      <div class="form-group"><label>Đã tiêu (native)</label><input id="f-spent" type="number" step="0.01" value="${a.amount_spent||''}" /></div>
+      <div class="form-group"><label>Số dư (native)</label><input id="f-bal" type="number" step="0.01" value="${a.balance||''}" /></div>
+      <div class="form-group"><label>Business ID</label><input id="f-biz" value="${esc(a.business_id||'')}" /></div>
+      <div class="form-group"><label>Active</label><select id="f-active"><option value="true" ${a.is_active!==false?'selected':''}>Có</option><option value="false" ${a.is_active===false?'selected':''}>Không</option></select></div>
+    </div>
+    <div class="form-group"><label>Ghi chú</label><textarea id="f-note">${esc(a.note||'')}</textarea></div>
+  `;
+  const foot=`
+    ${isEdit?`<button class="btn btn-red" onclick="deleteAccount(${id})">Xoá</button>`:''}
+    <div style="flex:1"></div>
+    <button class="btn btn-ghost" onclick="closeModal()">Huỷ</button>
+    <button class="btn btn-primary" onclick="saveAccount(${id||'null'})">Lưu</button>
+  `;
+  openModal(isEdit?'Sửa TKQC':'Thêm TKQC',body,foot);
+}
+
+async function saveAccount(id){
+  const data={
+    name:document.getElementById('f-name').value.trim(),
+    meta_account_id:document.getElementById('f-mid').value.trim(),
+    currency:document.getElementById('f-cur').value,
+    exchange_rate:parseFloat(document.getElementById('f-rate').value)||0,
+    status:document.getElementById('f-status').value.trim()||null,
+    spend_cap:parseFloat(document.getElementById('f-cap').value)||null,
+    amount_spent:parseFloat(document.getElementById('f-spent').value)||0,
+    balance:parseFloat(document.getElementById('f-bal').value)||null,
+    business_id:document.getElementById('f-biz').value.trim()||null,
+    is_active:document.getElementById('f-active').value==='true',
+    note:document.getElementById('f-note').value.trim()||null
+  };
+  if(!data.name||!data.meta_account_id)return toast('Tên và Meta Account ID bắt buộc','err');
+  try{
+    if(id){
+      const {error}=await sb.from('ad_accounts').update(data).eq('id',id);
+      if(error)throw error;
+      toast('Đã cập nhật','ok');
+    }else{
+      const {error}=await sb.from('ad_accounts').insert(data);
+      if(error)throw error;
+      toast('Đã thêm TKQC','ok');
+    }
+    closeModal();
+    await loadAll();renderAccounts();
+  }catch(e){toast('Lỗi: '+e.message,'err');}
+}
+
+async function deleteAccount(id){
+  if(!confirm('Xoá TKQC này? Toàn bộ chi tiêu liên quan cũng bị xoá.'))return;
+  try{
+    const {error}=await sb.from('ad_accounts').delete().eq('id',id);
+    if(error)throw error;
+    toast('Đã xoá','ok');closeModal();await loadAll();renderAccounts();
+  }catch(e){toast('Lỗi: '+e.message,'err');}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAGE 2: ĐẠI LÝ
+// ═══════════════════════════════════════════════════════════════
+let agSearch='',agFilter='all';
+function renderAgencies(){
+  const debtMap={};agencyDebt.forEach(d=>debtMap[d.agency_id]=d);
+  let list=agencies.slice();
+  if(agSearch){
+    const q=agSearch.toLowerCase();
+    list=list.filter(a=>(a.code||'').toLowerCase().includes(q)||(a.name||'').toLowerCase().includes(q)||(a.phone||'').includes(q));
+  }
+  if(agFilter==='active')list=list.filter(a=>a.is_active);
+  else if(agFilter==='debt')list=list.filter(a=>{const d=debtMap[a.id];return d&&(d.unpaid_vnd||0)>0;});
+  else if(agFilter==='over')list=list.filter(a=>{const d=debtMap[a.id];return d&&(d.unpaid_vnd||0)>=(d.debt_threshold_vnd||0)&&(d.unpaid_vnd||0)>0;});
+
+  let html=`
+    <h1 class="page-title">Đại lý</h1>
+    <p class="page-sub">${agencies.length} đại lý · ${agencies.filter(a=>a.is_active).length} active</p>
+
+    <div class="toolbar">
+      <input class="grow" id="ag-search" placeholder="Tìm theo mã, tên, SĐT..." value="${esc(agSearch)}" oninput="agSearch=this.value;renderAgencies()" />
+      <select onchange="agFilter=this.value;renderAgencies()">
+        <option value="all" ${agFilter==='all'?'selected':''}>Tất cả</option>
+        <option value="active" ${agFilter==='active'?'selected':''}>Đang active</option>
+        <option value="debt" ${agFilter==='debt'?'selected':''}>Đang nợ</option>
+        <option value="over" ${agFilter==='over'?'selected':''}>Nợ vượt ngưỡng</option>
+      </select>
+      <button class="btn btn-primary" onclick="openAgencyForm()">+ Thêm đại lý</button>
+    </div>
+
+    <div class="table-wrap"><div class="table-scroll"><table>
+      <thead><tr>
+        <th>Mã</th><th>Tên</th><th class="hide-sm">SĐT/Zalo</th><th>% phí</th>
+        <th>Đã thanh toán</th><th>Công nợ</th><th>Ngưỡng (VNĐ)</th><th class="hide-sm">Loại</th><th></th>
+      </tr></thead>
+      <tbody>`;
+  if(!list.length){
+    html+=`<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">🤝</div><div class="empty-state-title">Chưa có đại lý</div><div class="empty-state-desc">Bấm "+ Thêm đại lý" để bắt đầu</div></div></td></tr>`;
+  }else{
+    list.forEach(a=>{
+      const d=debtMap[a.id]||{};
+      const unpaid=parseInt(d.unpaid_vnd)||0;
+      const threshold=parseInt(a.debt_threshold_vnd)||0;
+      const over=unpaid>=threshold&&unpaid>0;
+      html+=`<tr>
+        <td><span class="badge b-blue mono">${esc(a.code)}</span></td>
+        <td><div style="font-weight:500;">${esc(a.name)}</div>${!a.is_active?'<span class="badge b-gray" style="font-size:10px;">Inactive</span>':''}</td>
+        <td class="hide-sm" style="font-size:12px;color:var(--tx3);">${esc(a.phone||'')}${a.zalo?' · '+esc(a.zalo):''}</td>
+        <td><input class="inline-input" type="number" step="0.01" min="0" max="100" value="${a.fee_percent}" onchange="updateAgencyFee(${a.id},this.value)" />%</td>
+        <td class="mono">${fmtVnd(d.total_paid_vnd||0)}</td>
+        <td class="mono" style="font-weight:600;${over?'color:var(--red);':unpaid>0?'color:var(--coral);':'color:var(--tx3);'}">${fmtVnd(unpaid)}${over?' ⚠️':''}</td>
+        <td class="mono" style="color:var(--tx3);font-size:12px;">${fmtVnd(threshold)}</td>
+        <td class="hide-sm"><span class="badge b-${a.payment_type==='prepaid'?'teal':'amber'}">${a.payment_type==='prepaid'?'Cọc trước':'Trả sau'}</span></td>
+        <td>
+          <button class="btn btn-ghost btn-sm" onclick="openAgencyDetail(${a.id})">Chi tiết</button>
+          <button class="btn btn-ghost btn-sm" onclick="openAgencyForm(${a.id})">Sửa</button>
+        </td>
+      </tr>`;
+    });
+  }
+  html+=`</tbody></table></div></div>`;
+  document.getElementById('page').innerHTML=html;
+}
+
+async function updateAgencyFee(id,val){
+  const v=parseFloat(val);
+  if(isNaN(v)||v<0||v>100)return toast('% phí phải 0-100','err');
+  try{
+    const {error}=await sb.from('agencies').update({fee_percent:v}).eq('id',id);
+    if(error)throw error;
+    toast('Đã lưu (lịch sử % được ghi nhận)','ok');
+    await loadAll();
+  }catch(e){toast('Lỗi: '+e.message,'err');}
+}
+
+function openAgencyForm(id){
+  const a=id?agencies.find(x=>x.id===id):{};
+  const isEdit=!!id;
+  const body=`
+    <div class="form-grid">
+      <div class="form-group"><label>Mã đại lý *</label><input id="f-code" value="${esc(a.code||'')}" placeholder="VVV" ${isEdit?'readonly':''} style="text-transform:uppercase;" /></div>
+      <div class="form-group"><label>Tên *</label><input id="f-name" value="${esc(a.name||'')}" placeholder="Tên đại lý" /></div>
+      <div class="form-group"><label>SĐT</label><input id="f-phone" value="${esc(a.phone||'')}" /></div>
+      <div class="form-group"><label>Zalo</label><input id="f-zalo" value="${esc(a.zalo||'')}" /></div>
+      <div class="form-group"><label>% phí (65-70)</label><input id="f-fee" type="number" step="0.01" min="0" max="100" value="${a.fee_percent||settings.default_fee_percent||65}" /></div>
+      <div class="form-group"><label>Ngưỡng cảnh báo nợ (VNĐ)</label><input id="f-thresh" type="number" step="1000000" value="${a.debt_threshold_vnd||settings.default_debt_threshold||200000000}" /></div>
+      <div class="form-group"><label>Loại thanh toán</label><select id="f-pay"><option value="postpaid" ${a.payment_type!=='prepaid'?'selected':''}>Trả sau (khách quen)</option><option value="prepaid" ${a.payment_type==='prepaid'?'selected':''}>Cọc trước (khách mới)</option></select></div>
+      <div class="form-group"><label>Active</label><select id="f-active"><option value="true" ${a.is_active!==false?'selected':''}>Có</option><option value="false" ${a.is_active===false?'selected':''}>Không</option></select></div>
+    </div>
+    <div class="form-group"><label>Ghi chú</label><textarea id="f-note">${esc(a.note||'')}</textarea></div>
+  `;
+  const foot=`
+    ${isEdit?`<button class="btn btn-red" onclick="deleteAgency(${id})">Xoá</button>`:''}
+    <div style="flex:1"></div>
+    <button class="btn btn-ghost" onclick="closeModal()">Huỷ</button>
+    <button class="btn btn-primary" onclick="saveAgency(${id||'null'})">Lưu</button>
+  `;
+  openModal(isEdit?'Sửa đại lý':'Thêm đại lý',body,foot);
+}
+
+async function saveAgency(id){
+  const data={
+    code:document.getElementById('f-code').value.trim().toUpperCase(),
+    name:document.getElementById('f-name').value.trim(),
+    phone:document.getElementById('f-phone').value.trim()||null,
+    zalo:document.getElementById('f-zalo').value.trim()||null,
+    fee_percent:parseFloat(document.getElementById('f-fee').value)||65,
+    debt_threshold_vnd:parseInt(document.getElementById('f-thresh').value)||0,
+    payment_type:document.getElementById('f-pay').value,
+    is_active:document.getElementById('f-active').value==='true',
+    note:document.getElementById('f-note').value.trim()||null
+  };
+  if(!data.code||!data.name)return toast('Mã và tên bắt buộc','err');
+  try{
+    if(id){
+      const {error}=await sb.from('agencies').update(data).eq('id',id);
+      if(error)throw error;
+      toast('Đã cập nhật','ok');
+    }else{
+      const {error}=await sb.from('agencies').insert(data);
+      if(error)throw error;
+      toast('Đã thêm đại lý','ok');
+    }
+    closeModal();await loadAll();renderAgencies();
+  }catch(e){toast('Lỗi: '+e.message,'err');}
+}
+
+async function deleteAgency(id){
+  if(!confirm('Xoá đại lý này? Spend & payments liên quan vẫn còn nhưng mất link.'))return;
+  try{
+    const {error}=await sb.from('agencies').delete().eq('id',id);
+    if(error)throw error;
+    toast('Đã xoá','ok');closeModal();await loadAll();renderAgencies();
+  }catch(e){toast('Lỗi: '+e.message,'err');}
+}
+
+async function openAgencyDetail(id){
+  const a=agencies.find(x=>x.id===id);if(!a)return;
+  const d=agencyDebt.find(x=>x.agency_id===id)||{};
+  const ps=payments.filter(p=>p.agency_id===id).slice(0,20);
+  const ss=spendDaily.filter(s=>s.agency_id===id).slice(0,30);
+  const {data:fh}=await sb.from('agency_fee_history').select('*').eq('agency_id',id).order('effective_from',{ascending:false});
+  const feeHistory=fh||[];
+
+  let html=`
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Tổng tính phí</div><div class="kpi-value">${fmtVnd(d.total_billed_vnd||0)}</div><div class="kpi-note">VNĐ</div></div>
+      <div class="kpi"><div class="kpi-label">Đã thanh toán</div><div class="kpi-value green">${fmtVnd(d.total_paid_vnd||0)}</div><div class="kpi-note">VNĐ</div></div>
+      <div class="kpi"><div class="kpi-label">Công nợ</div><div class="kpi-value red">${fmtVnd(d.unpaid_vnd||0)}</div><div class="kpi-note">VNĐ</div></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <button class="btn btn-green btn-sm" onclick="closeModal();openPaymentForm(${id})">+ Ghi nhận thanh toán</button>
+    </div>
+    <div class="section-title">Lịch sử % phí <span class="count">${feeHistory.length}</span></div>
+    <div class="table-scroll" style="margin-bottom:16px;"><table>
+      <thead><tr><th>Từ ngày</th><th>Đến ngày</th><th>%</th><th>Ghi chú</th></tr></thead>
+      <tbody>`;
+  if(!feeHistory.length){
+    html+=`<tr><td colspan="4" style="text-align:center;color:var(--tx3);font-size:12px;padding:14px;">Chưa có lịch sử</td></tr>`;
+  }else{
+    feeHistory.forEach(f=>{
+      html+=`<tr><td>${fmtDate(f.effective_from)}</td><td>${f.effective_to?fmtDate(f.effective_to):'<span class="badge b-green">Hiện tại</span>'}</td><td class="mono">${fmtNum(f.fee_percent,2)}%</td><td style="color:var(--tx3);font-size:12px;">${esc(f.note||'')}</td></tr>`;
+    });
+  }
+  html+=`</tbody></table></div>
+
+    <div class="section-title">Thanh toán gần đây <span class="count">${ps.length}</span></div>
+    <div class="table-scroll" style="margin-bottom:16px;"><table>
+      <thead><tr><th>Ngày</th><th>Số tiền</th><th>Phương thức</th><th>Ghi chú</th></tr></thead>
+      <tbody>`;
+  if(!ps.length){html+=`<tr><td colspan="4" style="text-align:center;color:var(--tx3);font-size:12px;padding:14px;">Chưa có thanh toán</td></tr>`;}
+  else ps.forEach(p=>{html+=`<tr><td>${fmtDate(p.paid_at)}</td><td class="mono" style="font-weight:600;">${fmtVnd(p.amount_vnd)}</td><td><span class="badge b-gray">${esc(p.payment_method||'—')}</span></td><td style="font-size:12px;color:var(--tx3);">${esc(p.note||p.reference_text||'')}</td></tr>`;});
+  html+=`</tbody></table></div>
+
+    <div class="section-title">Chi tiêu gần nhất <span class="count">${ss.length}</span></div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Ngày</th><th>Campaign</th><th>Spend</th><th>VNĐ</th><th>Đã trả</th></tr></thead>
+      <tbody>`;
+  if(!ss.length){html+=`<tr><td colspan="5" style="text-align:center;color:var(--tx3);font-size:12px;padding:14px;">Chưa có chi tiêu</td></tr>`;}
+  else ss.forEach(s=>{html+=`<tr><td>${fmtDate(s.date)}</td><td style="font-size:12px;">${esc(s.campaign_name||s.campaign_id)}</td><td class="mono">${fmtCur(s.spend_native,s.currency)}</td><td class="mono">${fmtVnd(s.amount_vnd)}</td><td>${s.is_paid?'<span class="badge b-green">Đã trả</span>':'<span class="badge b-amber">Chưa</span>'}</td></tr>`;});
+  html+=`</tbody></table></div>`;
+  openModal('Chi tiết: '+a.code+' — '+a.name,html);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAGE 3: CHI TIÊU
+// ═══════════════════════════════════════════════════════════════
+let spendGroupBy='agency'; // agency | account | date
+function renderSpend(){
+  let list=spendDaily.slice();
+  if(filterDateFrom)list=list.filter(s=>s.date>=filterDateFrom);
+  if(filterDateTo)list=list.filter(s=>s.date<=filterDateTo);
+  if(filterAgencyId)list=list.filter(s=>String(s.agency_id)===String(filterAgencyId));
+  if(filterAccountId)list=list.filter(s=>String(s.ad_account_id)===String(filterAccountId));
+
+  let html=`
+    <h1 class="page-title">Chi tiêu</h1>
+    <p class="page-sub">${list.length} dòng · ${filterDateFrom||'30 ngày'} → ${filterDateTo||'hôm nay'}</p>
+
+    <div class="toolbar">
+      <input type="date" value="${filterDateFrom}" onchange="filterDateFrom=this.value;renderSpend()" />
+      <span style="color:var(--tx3);">→</span>
+      <input type="date" value="${filterDateTo}" onchange="filterDateTo=this.value;renderSpend()" />
+      <select onchange="filterAgencyId=this.value;renderSpend()">
+        <option value="">Tất cả đại lý</option>
+        ${agencies.map(a=>`<option value="${a.id}" ${String(filterAgencyId)===String(a.id)?'selected':''}>${esc(a.code)} — ${esc(a.name)}</option>`).join('')}
+      </select>
+      <select onchange="filterAccountId=this.value;renderSpend()">
+        <option value="">Tất cả TKQC</option>
+        ${adAccounts.map(a=>`<option value="${a.id}" ${String(filterAccountId)===String(a.id)?'selected':''}>${esc(a.name)}</option>`).join('')}
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="filterDateFrom='';filterDateTo='';filterAgencyId='';filterAccountId='';renderSpend()">Reset</button>
+    </div>
+
+    <div class="sub-tabs">
+      <button class="sub-tab ${spendGroupBy==='agency'?'active':''}" onclick="spendGroupBy='agency';renderSpend()">Theo đại lý</button>
+      <button class="sub-tab ${spendGroupBy==='account'?'active':''}" onclick="spendGroupBy='account';renderSpend()">Theo TKQC</button>
+      <button class="sub-tab ${spendGroupBy==='date'?'active':''}" onclick="spendGroupBy='date';renderSpend()">Theo ngày</button>
+      <button class="sub-tab ${spendGroupBy==='detail'?'active':''}" onclick="spendGroupBy='detail';renderSpend()">Chi tiết campaign</button>
+    </div>
+  `;
+
+  if(spendGroupBy==='detail'){
+    html+=`<div class="table-wrap"><div class="table-scroll"><table>
+      <thead><tr><th>Ngày</th><th>TKQC</th><th>Campaign</th><th>Đại lý</th><th>Spend</th><th>VNĐ</th><th>Trạng thái</th></tr></thead>
+      <tbody>`;
+    if(!list.length){
+      html+=`<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-title">Chưa có dữ liệu</div><div class="empty-state-desc">Sync Meta API hoặc kiểm tra filter</div></div></td></tr>`;
+    }else{
+      list.slice(0,300).forEach(s=>{
+        const acc=adAccounts.find(a=>a.id===s.ad_account_id);
+        const ag=agencies.find(a=>a.id===s.agency_id);
+        html+=`<tr>
+          <td style="font-size:12px;">${fmtDate(s.date)}</td>
+          <td style="font-size:12px;">${esc(acc?acc.name:'—')}</td>
+          <td style="font-size:12px;">${esc(s.campaign_name||s.campaign_id)}</td>
+          <td>${ag?'<span class="badge b-blue">'+esc(ag.code)+'</span>':s.is_orphan?'<span class="badge b-red">SAI MÃ</span>':'<span class="badge b-gray">—</span>'}</td>
+          <td class="mono">${fmtCur(s.spend_native,s.currency)}</td>
+          <td class="mono">${fmtVnd(s.amount_vnd)}</td>
+          <td>${statusBadge(s.campaign_status)}</td>
+        </tr>`;
+      });
+      if(list.length>300)html+=`<tr><td colspan="7" style="text-align:center;color:var(--tx3);font-size:12px;">Hiển thị 300/${list.length} dòng — lọc thêm để xem chi tiết</td></tr>`;
+    }
+    html+=`</tbody></table></div></div>`;
+  }else{
+    const groupKey=spendGroupBy==='agency'?'agency_id':spendGroupBy==='account'?'ad_account_id':'date';
+    const groups={};
+    list.forEach(s=>{
+      const k=s[groupKey]||'__null__';
+      if(!groups[k])groups[k]={key:k,spend:{USD:0,EUR:0,VND:0},vnd:0,count:0};
+      groups[k].spend[s.currency]=(groups[k].spend[s.currency]||0)+(parseFloat(s.spend_native)||0);
+      groups[k].vnd+=(parseInt(s.amount_vnd)||0);
+      groups[k].count++;
+    });
+    const arr=Object.values(groups).sort((a,b)=>b.vnd-a.vnd);
+    const labelFn=(k)=>{
+      if(spendGroupBy==='agency'){if(k==='__null__')return'<span class="badge b-red">SAI MÃ / KHÔNG MATCH</span>';const a=agencies.find(x=>x.id==k);return a?'<span class="badge b-blue">'+esc(a.code)+'</span> '+esc(a.name):'#'+k;}
+      if(spendGroupBy==='account'){const a=adAccounts.find(x=>x.id==k);return a?esc(a.name)+' <span class="badge b-gray">'+a.currency+'</span>':'#'+k;}
+      return fmtDate(k);
+    };
+    html+=`<div class="table-wrap"><div class="table-scroll"><table>
+      <thead><tr><th>${spendGroupBy==='agency'?'Đại lý':spendGroupBy==='account'?'TKQC':'Ngày'}</th><th>Số dòng</th><th>Spend</th><th>VNĐ thu khách</th></tr></thead>
+      <tbody>`;
+    if(!arr.length){
+      html+=`<tr><td colspan="4"><div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-title">Chưa có dữ liệu</div></div></td></tr>`;
+    }else{
+      arr.forEach(g=>{
+        const sp=[];
+        if(g.spend.USD)sp.push(fmtNum(g.spend.USD,2)+' USD');
+        if(g.spend.EUR)sp.push(fmtNum(g.spend.EUR,2)+' EUR');
+        if(g.spend.VND)sp.push(fmtVnd(g.spend.VND)+' VND');
+        html+=`<tr><td>${labelFn(g.key)}</td><td class="mono" style="color:var(--tx3);">${g.count}</td><td class="mono" style="font-size:12px;">${sp.join(' · ')||'—'}</td><td class="mono" style="font-weight:600;">${fmtVnd(g.vnd)}</td></tr>`;
+      });
+      const totVnd=arr.reduce((a,g)=>a+g.vnd,0);
+      html+=`<tr style="background:var(--bg2);font-weight:600;"><td>Tổng</td><td class="mono">${list.length}</td><td></td><td class="mono">${fmtVnd(totVnd)}</td></tr>`;
+    }
+    html+=`</tbody></table></div></div>`;
+  }
+  document.getElementById('page').innerHTML=html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAGE 4: THANH TOÁN
+// ═══════════════════════════════════════════════════════════════
+let payFilterAgency='';
+function renderPayments(){
+  let list=payments.slice();
+  if(payFilterAgency)list=list.filter(p=>String(p.agency_id)===String(payFilterAgency));
+
+  let html=`
+    <h1 class="page-title">Thanh toán</h1>
+    <p class="page-sub">${list.length} giao dịch · Tổng đã thu: ${fmtVnd(list.reduce((a,p)=>a+(parseInt(p.amount_vnd)||0),0))} VNĐ</p>
+
+    <div class="toolbar">
+      <select onchange="payFilterAgency=this.value;renderPayments()">
+        <option value="">Tất cả đại lý</option>
+        ${agencies.map(a=>`<option value="${a.id}" ${String(payFilterAgency)===String(a.id)?'selected':''}>${esc(a.code)} — ${esc(a.name)}</option>`).join('')}
+      </select>
+      <button class="btn btn-primary" onclick="openPaymentForm()">+ Ghi nhận thanh toán</button>
+    </div>
+
+    <div class="section-title">Công nợ hiện tại theo đại lý</div>
+    <div class="table-wrap" style="margin-bottom:14px;"><div class="table-scroll"><table>
+      <thead><tr><th>Mã</th><th>Tên</th><th>Đã thanh toán</th><th>Tổng phí</th><th>Còn nợ</th><th></th></tr></thead>
+      <tbody>`;
+  const debtList=agencyDebt.slice().sort((a,b)=>(b.unpaid_vnd||0)-(a.unpaid_vnd||0));
+  if(!debtList.length){
+    html+=`<tr><td colspan="6" style="text-align:center;color:var(--tx3);padding:14px;">Chưa có dữ liệu</td></tr>`;
+  }else{
+    debtList.forEach(d=>{
+      const unpaid=parseInt(d.unpaid_vnd)||0;
+      html+=`<tr>
+        <td><span class="badge b-blue">${esc(d.agency_code)}</span></td>
+        <td>${esc(d.agency_name)}</td>
+        <td class="mono">${fmtVnd(d.total_paid_vnd)}</td>
+        <td class="mono" style="color:var(--tx3);">${fmtVnd(d.total_billed_vnd)}</td>
+        <td class="mono" style="font-weight:600;${unpaid>0?'color:var(--red);':''}">${fmtVnd(unpaid)}</td>
+        <td>${unpaid>0?`<button class="btn btn-green btn-sm" onclick="openPaymentForm(${d.agency_id},${unpaid})">+ Thanh toán</button>`:''}</td>
+      </tr>`;
+    });
+  }
+  html+=`</tbody></table></div></div>
+
+    <div class="section-title">Lịch sử thanh toán <span class="count">${list.length}</span></div>
+    <div class="table-wrap"><div class="table-scroll"><table>
+      <thead><tr><th>Ngày</th><th>Đại lý</th><th>Số tiền</th><th>Phương thức</th><th>Mã GD</th><th>Ghi chú</th><th></th></tr></thead>
+      <tbody>`;
+  if(!list.length){
+    html+=`<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">💸</div><div class="empty-state-title">Chưa có giao dịch</div></div></td></tr>`;
+  }else{
+    list.forEach(p=>{
+      const a=agencies.find(x=>x.id===p.agency_id);
+      html+=`<tr>
+        <td style="font-size:12px;">${fmtDate(p.paid_at)}</td>
+        <td>${a?'<span class="badge b-blue">'+esc(a.code)+'</span> '+esc(a.name):'<span class="badge b-gray">#'+p.agency_id+'</span>'}</td>
+        <td class="mono" style="font-weight:600;color:var(--green);">${fmtVnd(p.amount_vnd)}</td>
+        <td><span class="badge b-gray">${esc(p.payment_method||'—')}</span></td>
+        <td style="font-size:12px;color:var(--tx3);">${esc(p.reference_text||'')}</td>
+        <td style="font-size:12px;color:var(--tx3);">${esc(p.note||'')}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="deletePayment(${p.id})">Xoá</button></td>
+      </tr>`;
+    });
+  }
+  html+=`</tbody></table></div></div>`;
+  document.getElementById('page').innerHTML=html;
+}
+
+function openPaymentForm(agencyId,suggestAmount){
+  const body=`
+    <div class="form-grid">
+      <div class="form-group"><label>Đại lý *</label>
+        <select id="f-agency"><option value="">Chọn...</option>${agencies.filter(a=>a.is_active).map(a=>`<option value="${a.id}" ${a.id===agencyId?'selected':''}>${esc(a.code)} — ${esc(a.name)}</option>`).join('')}</select>
+      </div>
+      <div class="form-group"><label>Số tiền (VNĐ) *</label><input id="f-amount" type="number" step="1000" value="${suggestAmount||''}" /></div>
+      <div class="form-group"><label>Ngày thanh toán *</label><input id="f-date" type="date" value="${todayStr()}" /></div>
+      <div class="form-group"><label>Phương thức</label><select id="f-method"><option value="bank">Chuyển khoản</option><option value="cash">Tiền mặt</option><option value="momo">MoMo</option><option value="other">Khác</option></select></div>
+      <div class="form-group"><label>Mã giao dịch</label><input id="f-ref" placeholder="VD: VCB123456" /></div>
+      <div class="form-group"><label>Tỷ giá lúc thanh toán</label><input id="f-rate" type="number" step="0.0001" placeholder="Ghi nhớ tỷ giá" /></div>
+    </div>
+    <div class="form-group"><label>Ghi chú</label><textarea id="f-note"></textarea></div>
+  `;
+  const foot=`<div style="flex:1"></div><button class="btn btn-ghost" onclick="closeModal()">Huỷ</button><button class="btn btn-primary" onclick="savePayment()">Ghi nhận</button>`;
+  openModal('Ghi nhận thanh toán',body,foot);
+}
+
+async function savePayment(){
+  const data={
+    agency_id:parseInt(document.getElementById('f-agency').value)||null,
+    amount_vnd:parseInt(document.getElementById('f-amount').value)||0,
+    paid_at:document.getElementById('f-date').value,
+    payment_method:document.getElementById('f-method').value,
+    reference_text:document.getElementById('f-ref').value.trim()||null,
+    exchange_rate_snapshot:parseFloat(document.getElementById('f-rate').value)||null,
+    note:document.getElementById('f-note').value.trim()||null
+  };
+  if(!data.agency_id||!data.amount_vnd||!data.paid_at)return toast('Đại lý, số tiền và ngày bắt buộc','err');
+  try{
+    const {error}=await sb.from('payments').insert(data);
+    if(error)throw error;
+    toast('Đã ghi nhận thanh toán','ok');
+    closeModal();await loadAll();renderPayments();
+  }catch(e){toast('Lỗi: '+e.message,'err');}
+}
+
+async function deletePayment(id){
+  if(!confirm('Xoá giao dịch thanh toán này?'))return;
+  try{
+    const {error}=await sb.from('payments').delete().eq('id',id);
+    if(error)throw error;
+    toast('Đã xoá','ok');await loadAll();renderPayments();
+  }catch(e){toast('Lỗi: '+e.message,'err');}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAGE 5: CẢNH BÁO
+// ═══════════════════════════════════════════════════════════════
+function renderAlerts(){
+  const debtOver=agencyDebt.filter(a=>(a.unpaid_vnd||0)>=(a.debt_threshold_vnd||0)&&(a.unpaid_vnd||0)>0)
+                           .sort((a,b)=>(b.unpaid_vnd||0)-(a.unpaid_vnd||0));
+  const policyOpen=policyAlerts.filter(p=>!p.is_resolved);
+  const orphans={};
+  spendDaily.filter(s=>s.is_orphan).forEach(s=>{
+    const k=s.campaign_id;
+    if(!orphans[k])orphans[k]={campaign_id:k,campaign_name:s.campaign_name,ad_account_id:s.ad_account_id,total_vnd:0,total_native:0,currency:s.currency,detected_code:s.agency_code};
+    orphans[k].total_vnd+=(parseInt(s.amount_vnd)||0);
+    orphans[k].total_native+=(parseFloat(s.spend_native)||0);
+  });
+  const orphanList=Object.values(orphans);
+
+  let html=`
+    <h1 class="page-title">Cảnh báo</h1>
+    <p class="page-sub">${debtOver.length} nợ vượt ngưỡng · ${policyOpen.length} vi phạm chính sách · ${orphanList.length} campaign sai mã đại lý</p>
+
+    <div class="section-title">⚠️ Nợ vượt ngưỡng <span class="count">${debtOver.length}</span></div>
+    <div class="table-wrap" style="margin-bottom:18px;"><div class="table-scroll"><table>
+      <thead><tr><th>Mã</th><th>Đại lý</th><th>Công nợ</th><th>Ngưỡng</th><th>Vượt</th><th></th></tr></thead>
+      <tbody>`;
+  if(!debtOver.length){
+    html+=`<tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon">✓</div><div class="empty-state-title">Không có đại lý nào nợ vượt ngưỡng</div></div></td></tr>`;
+  }else{
+    debtOver.forEach(d=>{
+      const over=(d.unpaid_vnd||0)-(d.debt_threshold_vnd||0);
+      html+=`<tr>
+        <td><span class="badge b-blue">${esc(d.agency_code)}</span></td>
+        <td>${esc(d.agency_name)}</td>
+        <td class="mono" style="font-weight:600;color:var(--red);">${fmtVnd(d.unpaid_vnd)}</td>
+        <td class="mono" style="color:var(--tx3);">${fmtVnd(d.debt_threshold_vnd)}</td>
+        <td class="mono" style="color:var(--red);">+${fmtVnd(over)}</td>
+        <td><button class="btn btn-green btn-sm" onclick="openPaymentForm(${d.agency_id},${d.unpaid_vnd})">+ Thanh toán</button></td>
+      </tr>`;
+    });
+  }
+  html+=`</tbody></table></div></div>
+
+    <div class="section-title">🚫 Campaign vi phạm chính sách <span class="count">${policyOpen.length}</span></div>
+    <div class="table-wrap" style="margin-bottom:18px;"><div class="table-scroll"><table>
+      <thead><tr><th>Loại</th><th>Campaign</th><th>Đại lý</th><th>TKQC</th><th>Phát hiện</th><th></th></tr></thead>
+      <tbody>`;
+  if(!policyOpen.length){
+    html+=`<tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon">✓</div><div class="empty-state-title">Không có campaign vi phạm</div></div></td></tr>`;
+  }else{
+    policyOpen.forEach(a=>{
+      const acc=adAccounts.find(x=>x.id===a.ad_account_id);
+      html+=`<tr>
+        <td>${statusBadge(a.issue_type)}</td>
+        <td><div style="font-weight:500;font-size:12px;">${esc(a.campaign_name||a.campaign_id)}</div><div style="font-size:11px;color:var(--tx3);">${esc(a.issue_detail||'')}</div></td>
+        <td>${a.agency_code?'<span class="badge b-blue">'+esc(a.agency_code)+'</span>':'<span class="badge b-gray">—</span>'}</td>
+        <td style="font-size:12px;">${esc(acc?acc.name:'#'+a.ad_account_id)}</td>
+        <td style="font-size:12px;color:var(--tx3);">${fmtDate(a.detected_at)}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="resolveAlert(${a.id})">✓ Đã xử lý</button></td>
+      </tr>`;
+    });
+  }
+  html+=`</tbody></table></div></div>
+
+    <div class="section-title">❓ Campaign sai mã đại lý <span class="count">${orphanList.length}</span></div>
+    <p style="font-size:12px;color:var(--tx3);margin-bottom:8px;">Tên campaign không khớp với đại lý nào trong hệ thống. Kiểm tra: tên campaign có đúng format <code>MÃ-...</code> không, mã có trong danh sách đại lý không.</p>
+    <div class="table-wrap"><div class="table-scroll"><table>
+      <thead><tr><th>Campaign</th><th>TKQC</th><th>Mã detect được</th><th>Spend</th><th>VNĐ tích luỹ</th><th></th></tr></thead>
+      <tbody>`;
+  if(!orphanList.length){
+    html+=`<tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon">✓</div><div class="empty-state-title">Tất cả campaign đều đúng mã</div></div></td></tr>`;
+  }else{
+    orphanList.forEach(o=>{
+      const acc=adAccounts.find(x=>x.id===o.ad_account_id);
+      html+=`<tr>
+        <td style="font-size:12px;">${esc(o.campaign_name||o.campaign_id)}</td>
+        <td style="font-size:12px;">${esc(acc?acc.name:'#'+o.ad_account_id)}</td>
+        <td>${o.detected_code?'<span class="badge b-amber">'+esc(o.detected_code)+'</span>':'<span class="badge b-red">Không detect được</span>'}</td>
+        <td class="mono">${fmtCur(o.total_native,o.currency)}</td>
+        <td class="mono">${fmtVnd(o.total_vnd)}</td>
+        <td>${o.detected_code?`<button class="btn btn-primary btn-sm" onclick="quickAddAgency('${esc(o.detected_code)}')">+ Thêm "${esc(o.detected_code)}"</button>`:''}</td>
+      </tr>`;
+    });
+  }
+  html+=`</tbody></table></div></div>`;
+  document.getElementById('page').innerHTML=html;
+}
+
+async function resolveAlert(id){
+  try{
+    const {error}=await sb.from('policy_alerts').update({is_resolved:true,resolved_at:new Date().toISOString()}).eq('id',id);
+    if(error)throw error;
+    toast('Đã đánh dấu xử lý','ok');await loadAll();renderAlerts();
+  }catch(e){toast('Lỗi: '+e.message,'err');}
+}
+
+function quickAddAgency(code){
+  const body=`
+    <p style="margin-bottom:12px;color:var(--tx2);font-size:13px;">Tạo đại lý mới với mã <strong>${esc(code)}</strong> để các campaign hiện đang sai mã được khớp lại.</p>
+    <div class="form-grid">
+      <div class="form-group"><label>Mã *</label><input id="f-code" value="${esc(code)}" readonly /></div>
+      <div class="form-group"><label>Tên *</label><input id="f-name" placeholder="Tên đại lý" autofocus /></div>
+      <div class="form-group"><label>SĐT/Zalo</label><input id="f-phone" /></div>
+      <div class="form-group"><label>% phí</label><input id="f-fee" type="number" step="0.01" value="${settings.default_fee_percent||65}" /></div>
+    </div>
+  `;
+  const foot=`<div style="flex:1"></div><button class="btn btn-ghost" onclick="closeModal()">Huỷ</button><button class="btn btn-primary" onclick="saveQuickAgency('${esc(code)}')">Tạo & Khớp lại</button>`;
+  openModal('Tạo nhanh đại lý từ orphan',body,foot);
+}
+
+async function saveQuickAgency(code){
+  const data={
+    code:code.toUpperCase(),
+    name:document.getElementById('f-name').value.trim(),
+    phone:document.getElementById('f-phone').value.trim()||null,
+    fee_percent:parseFloat(document.getElementById('f-fee').value)||65,
+    debt_threshold_vnd:parseInt(settings.default_debt_threshold)||200000000
+  };
+  if(!data.name)return toast('Tên bắt buộc','err');
+  try{
+    const {data:newAg,error}=await sb.from('agencies').insert(data).select().single();
+    if(error)throw error;
+    // Khớp lại các spend orphan có agency_code = code
+    await sb.from('spend_daily').update({agency_id:newAg.id,is_orphan:false}).eq('agency_code',data.code).is('agency_id',null);
+    toast('Đã tạo đại lý và khớp lại campaign','ok');
+    closeModal();await loadAll();renderAlerts();
+  }catch(e){toast('Lỗi: '+e.message,'err');}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAGE 6: ADMIN
+// ═══════════════════════════════════════════════════════════════
+function renderAdmin(){
+  let html=`
+    <h1 class="page-title">Admin</h1>
+    <p class="page-sub">Cấu hình Meta API, mặc định, và regex detect mã đại lý</p>
+
+    <div class="card">
+      <h3>🔑 Meta Marketing API</h3>
+      <p style="font-size:12px;color:var(--tx3);margin-bottom:12px;">Token long-lived để pull spend, status, policy. Tạo tại <a href="https://developers.facebook.com/tools/explorer" target="_blank" style="color:var(--blue);">Graph API Explorer</a> → System User token (không hết hạn).</p>
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1;"><label>Meta Access Token</label><input id="s-token" type="password" value="${esc(metaToken)}" placeholder="EAAxxxxxxxx..." /></div>
+        <div class="form-group"><label>Business Manager ID</label><input id="s-biz" value="${esc(metaBusinessId)}" placeholder="VD: 123456789" /></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-primary" onclick="saveMetaSettings()">Lưu</button>
+        <button class="btn btn-ghost" onclick="testMetaToken()">Test kết nối</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>⚙️ Mặc định</h3>
+      <div class="form-grid">
+        <div class="form-group"><label>% phí mặc định</label><input id="s-fee" type="number" step="0.01" value="${esc(settings.default_fee_percent||65)}" /></div>
+        <div class="form-group"><label>Ngưỡng cảnh báo nợ (VNĐ)</label><input id="s-thresh" type="number" step="1000000" value="${esc(settings.default_debt_threshold||200000000)}" /></div>
+        <div class="form-group" style="grid-column:1/-1;"><label>Regex detect mã đại lý từ tên campaign</label><input id="s-pattern" value="${esc(codePattern)}" /></div>
+      </div>
+      <p style="font-size:11px;color:var(--tx3);margin:6px 0 12px;">Regex JS, group 1 = mã. Mặc định <code>^([A-Z0-9]+)-</code> bắt prefix trước dấu <code>-</code> đầu tiên (vd <code>VVV</code> trong <code>VVV-TC-ZD</code>).</p>
+      <button class="btn btn-primary" onclick="saveDefaults()">Lưu</button>
+    </div>
+
+    <div class="card">
+      <h3>🔄 Đồng bộ thủ công</h3>
+      <p style="font-size:12px;color:var(--tx3);margin-bottom:12px;">Nếu spend chưa cập nhật hoặc tỷ giá đã đổi, bấm để re-tính amount_vnd cho toàn bộ spend chưa thanh toán.</p>
+      <button class="btn btn-ghost" onclick="recomputeAmounts()">Tính lại VNĐ cho spend chưa trả</button>
+    </div>
+
+    <div class="card" style="border-color:var(--red-bg);">
+      <h3 style="color:var(--red-tx);">⚠️ Vùng nguy hiểm</h3>
+      <p style="font-size:12px;color:var(--tx3);margin-bottom:12px;">Xoá toàn bộ spend_daily (giữ nguyên TKQC, đại lý, payments). Dùng khi muốn re-sync sạch.</p>
+      <button class="btn btn-red" onclick="purgeSpend()">Xoá toàn bộ spend_daily</button>
+    </div>
+  `;
+  document.getElementById('page').innerHTML=html;
+}
+
+async function saveSettings(updates){
+  try{
+    const rows=Object.entries(updates).map(([key,value])=>({key,value:String(value??'')}));
+    const {error}=await sb.from('app_settings').upsert(rows,{onConflict:'key'});
+    if(error)throw error;
+    toast('Đã lưu','ok');
+    await loadAll();
+    return true;
+  }catch(e){toast('Lỗi: '+e.message,'err');return false;}
+}
+
+async function saveMetaSettings(){
+  await saveSettings({
+    meta_access_token:document.getElementById('s-token').value.trim(),
+    meta_business_id:document.getElementById('s-biz').value.trim()
+  });
+  renderAdmin();
+}
+
+async function saveDefaults(){
+  const ok=await saveSettings({
+    default_fee_percent:document.getElementById('s-fee').value.trim(),
+    default_debt_threshold:document.getElementById('s-thresh').value.trim(),
+    agency_code_pattern:document.getElementById('s-pattern').value.trim()
+  });
+  if(ok)renderAdmin();
+}
+
+async function testMetaToken(){
+  const token=document.getElementById('s-token').value.trim();
+  if(!token)return toast('Nhập token trước','err');
+  try{
+    const r=await fetch('https://graph.facebook.com/v19.0/me?access_token='+encodeURIComponent(token));
+    const d=await r.json();
+    if(d.error)throw new Error(d.error.message);
+    toast('OK — User: '+(d.name||d.id),'ok');
+  }catch(e){toast('Lỗi: '+e.message,'err');}
+}
+
+async function recomputeAmounts(){
+  if(!confirm('Tính lại amount_vnd cho toàn bộ spend chưa thanh toán theo tỷ giá hiện hành & % hiện hành?'))return;
+  try{
+    const accMap={};adAccounts.forEach(a=>accMap[a.id]=a);
+    const agMap={};agencies.forEach(a=>agMap[a.id]=a);
+    const unpaid=spendDaily.filter(s=>!s.is_paid&&s.agency_id);
+    let n=0;
+    for(const s of unpaid){
+      const acc=accMap[s.ad_account_id];const ag=agMap[s.agency_id];
+      if(!acc||!ag)continue;
+      const rate=parseFloat(acc.exchange_rate)||0;
+      const fee=parseFloat(ag.fee_percent)||0;
+      const vnd=Math.round((parseFloat(s.spend_native)||0)*(fee/100)*rate);
+      await sb.from('spend_daily').update({amount_vnd:vnd,exchange_rate_snapshot:rate,fee_percent_snapshot:fee}).eq('id',s.id);
+      n++;
+    }
+    toast('Đã tính lại '+n+' dòng','ok');
+    await loadAll();
+  }catch(e){toast('Lỗi: '+e.message,'err');}
+}
+
+async function purgeSpend(){
+  if(!confirm('XOÁ TOÀN BỘ spend_daily? Hành động này không thể hoàn tác.'))return;
+  if(!confirm('Bạn chắc chắn?'))return;
+  try{
+    const {error}=await sb.from('spend_daily').delete().neq('id',0);
+    if(error)throw error;
+    toast('Đã xoá toàn bộ spend','ok');await loadAll();renderAdmin();
+  }catch(e){toast('Lỗi: '+e.message,'err');}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// META API SYNC
+// ═══════════════════════════════════════════════════════════════
+async function syncMeta(){
+  if(!metaToken)return toast('Cấu hình Meta token ở tab Admin trước','err');
+  if(!adAccounts.length)return toast('Chưa có TKQC để sync','err');
+  toast('Đang sync...','');
+  let totalCampaigns=0,totalRows=0,errors=0;
+  try{
+    const today=todayStr();
+    const since=monthAgo();
+    for(const acc of adAccounts){
+      if(!acc.is_active)continue;
+      // 1. Pull account info (status, balance, amount_spent)
+      try{
+        const url1=`https://graph.facebook.com/v19.0/${encodeURIComponent(acc.meta_account_id)}?fields=account_status,balance,amount_spent,spend_cap,currency&access_token=${encodeURIComponent(metaToken)}`;
+        const r=await fetch(url1);const d=await r.json();
+        if(d.error)throw new Error(d.error.message);
+        const statusMap={1:'ACTIVE',2:'DISABLED',3:'UNSETTLED',7:'PENDING_RISK_REVIEW',8:'PENDING_SETTLEMENT',9:'IN_GRACE_PERIOD',100:'PENDING_CLOSURE',101:'CLOSED',102:'ANY_ACTIVE',201:'ANY_CLOSED'};
+        await sb.from('ad_accounts').update({
+          status:statusMap[d.account_status]||String(d.account_status||''),
+          balance:parseFloat(d.balance)/100||null,
+          amount_spent:parseFloat(d.amount_spent)/100||0,
+          spend_cap:d.spend_cap?parseFloat(d.spend_cap)/100:null
+        }).eq('id',acc.id);
+      }catch(e){console.warn('account info '+acc.meta_account_id+': '+e.message);errors++;}
+
+      // 2. Pull campaign insights (spend per campaign per day)
+      try{
+        const url2=`https://graph.facebook.com/v19.0/${encodeURIComponent(acc.meta_account_id)}/insights?fields=campaign_id,campaign_name,spend,date_start&level=campaign&time_increment=1&time_range={"since":"${since}","until":"${today}"}&limit=500&access_token=${encodeURIComponent(metaToken)}`;
+        let next=url2;
+        while(next){
+          const r=await fetch(next);const d=await r.json();
+          if(d.error)throw new Error(d.error.message);
+          for(const row of (d.data||[])){
+            const code=detectAgencyCode(row.campaign_name);
+            const ag=code?agencies.find(a=>a.code===code):null;
+            const rate=parseFloat(acc.exchange_rate)||0;
+            const fee=ag?parseFloat(ag.fee_percent)||0:0;
+            const spend=parseFloat(row.spend)||0;
+            const vnd=ag?Math.round(spend*(fee/100)*rate):null;
+            await sb.from('spend_daily').upsert({
+              date:row.date_start,
+              ad_account_id:acc.id,
+              campaign_id:row.campaign_id,
+              campaign_name:row.campaign_name,
+              agency_code:code,
+              agency_id:ag?ag.id:null,
+              spend_native:spend,
+              currency:acc.currency,
+              exchange_rate_snapshot:rate,
+              fee_percent_snapshot:fee,
+              amount_vnd:vnd,
+              is_orphan:!ag
+            },{onConflict:'date,ad_account_id,campaign_id'});
+            totalRows++;
+          }
+          next=d.paging&&d.paging.next?d.paging.next:null;
+        }
+      }catch(e){console.warn('insights '+acc.meta_account_id+': '+e.message);errors++;}
+
+      // 3. Pull campaign status + effective_status (cho policy alerts)
+      try{
+        const url3=`https://graph.facebook.com/v19.0/${encodeURIComponent(acc.meta_account_id)}/campaigns?fields=id,name,status,effective_status&limit=300&access_token=${encodeURIComponent(metaToken)}`;
+        let next=url3;
+        while(next){
+          const r=await fetch(next);const d=await r.json();
+          if(d.error)throw new Error(d.error.message);
+          for(const c of (d.data||[])){
+            totalCampaigns++;
+            // Update spend_daily.campaign_status
+            await sb.from('spend_daily').update({campaign_status:c.status}).eq('ad_account_id',acc.id).eq('campaign_id',c.id);
+            // Check effective_status cho policy violation
+            const violations=['DISAPPROVED','CAMPAIGN_PAUSED','PENDING_REVIEW','REJECTED','PENDING_BILLING_INFO','POLICY_VIOLATION'];
+            if(violations.includes(c.effective_status)){
+              const code=detectAgencyCode(c.name);
+              const ag=code?agencies.find(a=>a.code===code):null;
+              await sb.from('policy_alerts').upsert({
+                ad_account_id:acc.id,
+                campaign_id:c.id,
+                campaign_name:c.name,
+                agency_id:ag?ag.id:null,
+                agency_code:code,
+                issue_type:c.effective_status,
+                issue_detail:'Detected từ effective_status'
+              },{onConflict:'ad_account_id,campaign_id,issue_type'});
+            }
+          }
+          next=d.paging&&d.paging.next?d.paging.next:null;
+        }
+      }catch(e){console.warn('campaigns '+acc.meta_account_id+': '+e.message);errors++;}
+    }
+    toast(`Sync xong: ${totalRows} dòng spend, ${totalCampaigns} campaigns${errors?', '+errors+' lỗi':''}`,errors?'err':'ok');
+    await loadAll();
+    const renders=[renderOverview,renderAccounts,renderAgencies,renderSpend,renderPayments,renderAlerts,renderAdmin];
+    renders[curPage]();
+  }catch(e){
+    toast('Sync lỗi: '+e.message,'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+(async function init(){
+  await loadAll();
+  pg(0);
+})();
+</script>
+</body>
+</html>
