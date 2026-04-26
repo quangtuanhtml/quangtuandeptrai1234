@@ -1424,14 +1424,17 @@ async function syncMeta(){
   if(!adAccounts.length)return toast('Chưa có TKQC để sync','err');
   toast('Đang sync...','');
   let totalCampaigns=0,totalRows=0,errors=0;
+  const errMsgs=[];
   try{
     const today=todayStr();
     const since=(typeof syncSinceOverride!=='undefined'&&syncSinceOverride)||'2025-01-01';
     for(const acc of adAccounts){
       if(!acc.is_active)continue;
+      // Đảm bảo có prefix "act_" — Meta API yêu cầu
+      const aid=String(acc.meta_account_id||'').startsWith('act_')?acc.meta_account_id:'act_'+acc.meta_account_id;
       // 1. Pull account info (status, balance, amount_spent)
       try{
-        const url1=`https://graph.facebook.com/v19.0/${encodeURIComponent(acc.meta_account_id)}?fields=account_status,balance,amount_spent,spend_cap,currency&access_token=${encodeURIComponent(metaToken)}`;
+        const url1=`https://graph.facebook.com/v19.0/${encodeURIComponent(aid)}?fields=account_status,balance,amount_spent,spend_cap,currency&access_token=${encodeURIComponent(metaToken)}`;
         const r=await fetch(url1);const d=await r.json();
         if(d.error)throw new Error(d.error.message);
         const statusMap={1:'ACTIVE',2:'DISABLED',3:'UNSETTLED',7:'PENDING_RISK_REVIEW',8:'PENDING_SETTLEMENT',9:'IN_GRACE_PERIOD',100:'PENDING_CLOSURE',101:'CLOSED',102:'ANY_ACTIVE',201:'ANY_CLOSED'};
@@ -1441,11 +1444,11 @@ async function syncMeta(){
           amount_spent:parseFloat(d.amount_spent)/100||0,
           spend_cap:d.spend_cap?parseFloat(d.spend_cap)/100:null
         }).eq('id',acc.id);
-      }catch(e){console.warn('account info '+acc.meta_account_id+': '+e.message);errors++;}
+      }catch(e){console.warn('account info '+aid+': '+e.message);errMsgs.push('TK '+aid+' info: '+e.message);errors++;}
 
       // 2. Pull campaign insights (spend per campaign per day)
       try{
-        const url2=`https://graph.facebook.com/v19.0/${encodeURIComponent(acc.meta_account_id)}/insights?fields=campaign_id,campaign_name,spend,date_start&level=campaign&time_increment=1&time_range={"since":"${since}","until":"${today}"}&limit=500&access_token=${encodeURIComponent(metaToken)}`;
+        const url2=`https://graph.facebook.com/v19.0/${encodeURIComponent(aid)}/insights?fields=campaign_id,campaign_name,spend,date_start&level=campaign&time_increment=1&time_range={"since":"${since}","until":"${today}"}&limit=500&access_token=${encodeURIComponent(metaToken)}`;
         let next=url2;
         while(next){
           const r=await fetch(next);const d=await r.json();
@@ -1475,11 +1478,11 @@ async function syncMeta(){
           }
           next=d.paging&&d.paging.next?d.paging.next:null;
         }
-      }catch(e){console.warn('insights '+acc.meta_account_id+': '+e.message);errors++;}
+      }catch(e){console.warn('insights '+aid+': '+e.message);errMsgs.push('TK '+aid+' insights: '+e.message);errors++;}
 
       // 3. Pull campaign status + effective_status (cho policy alerts)
       try{
-        const url3=`https://graph.facebook.com/v19.0/${encodeURIComponent(acc.meta_account_id)}/campaigns?fields=id,name,status,effective_status&limit=300&access_token=${encodeURIComponent(metaToken)}`;
+        const url3=`https://graph.facebook.com/v19.0/${encodeURIComponent(aid)}/campaigns?fields=id,name,status,effective_status&limit=300&access_token=${encodeURIComponent(metaToken)}`;
         let next=url3;
         while(next){
           const r=await fetch(next);const d=await r.json();
@@ -1506,8 +1509,9 @@ async function syncMeta(){
           }
           next=d.paging&&d.paging.next?d.paging.next:null;
         }
-      }catch(e){console.warn('campaigns '+acc.meta_account_id+': '+e.message);errors++;}
+      }catch(e){console.warn('campaigns '+aid+': '+e.message);errMsgs.push('TK '+aid+' campaigns: '+e.message);errors++;}
     }
+    if(errors&&errMsgs.length){alert('Lỗi sync chi tiết:\n\n'+errMsgs.slice(0,5).join('\n\n'));}
     toast(`Sync xong: ${totalRows} dòng spend, ${totalCampaigns} campaigns${errors?', '+errors+' lỗi':''}`,errors?'err':'ok');
     await loadAll();
     const renders=[renderOverview,renderAccounts,renderAgencies,renderSpend,renderPayments,renderAlerts,renderAdmin];
