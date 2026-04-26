@@ -243,7 +243,7 @@ const sb=supabase.createClient(SB_URL,SB_KEY);
 
 // ─── State ───
 let curPage=0;
-let adAccounts=[],agencies=[],spendDaily=[],payments=[],policyAlerts=[],settings={};
+let adAccounts=[],agencies=[],spendDaily=[],payments=[],policyAlerts=[],settings={},assignments=[];
 let agencyDebt=[]; // computed from view v_agency_debt
 let metaToken='',metaBusinessId='',codePattern='^([A-Z0-9]+)-';
 let filterDateFrom='',filterDateTo='',filterAgencyId='',filterAccountId='';
@@ -258,6 +258,33 @@ function fmtCur(n,cur){const v=fmtNum(n,cur==='VND'?0:2);return v+' '+(cur||'');
 function fmtDate(d){if(!d)return'';const dt=typeof d==='string'?new Date(d):d;return dt.toLocaleDateString('vi-VN');}
 function todayStr(){return new Date().toISOString().slice(0,10);}
 function monthAgo(){const d=new Date();d.setDate(d.getDate()-30);return d.toISOString().slice(0,10);}
+
+// Tìm agency_id phụ trách (ad_account_id, date) theo assignment khoảng ngày
+// Trả về null nếu không có assignment phủ ngày đó
+function findAgencyForSpend(adAccountId,date){
+  const today=todayStr();
+  // Ưu tiên assignment có start_date muộn nhất (overlapping → cái mới nhất)
+  let best=null;
+  assignments.forEach(x=>{
+    if(x.ad_account_id!==adAccountId)return;
+    if(date<x.start_date)return;
+    if(x.end_date&&date>x.end_date)return;
+    if(!best||x.start_date>best.start_date)best=x;
+  });
+  return best?best.agency_id:null;
+}
+
+// Danh sách assignments đang active của 1 TKQC tính tới hôm nay
+function activeAssignments(adAccountId){
+  const today=todayStr();
+  return assignments.filter(x=>x.ad_account_id===adAccountId&&(!x.end_date||x.end_date>=today));
+}
+
+// Danh sách assignments đang active của 1 đại lý
+function activeAssignmentsForAgency(agencyId){
+  const today=todayStr();
+  return assignments.filter(x=>x.agency_id===agencyId&&(!x.end_date||x.end_date>=today));
+}
 
 function toast(msg,type){
   const c=document.getElementById('toast-container');
@@ -321,14 +348,15 @@ function detectAgencyCode(name){
 async function loadAll(){
   isLoading=true;
   try{
-    const [r1,r2,r3,r4,r5,r6,r7]=await Promise.all([
+    const [r1,r2,r3,r4,r5,r6,r7,r8]=await Promise.all([
       sb.from('ad_accounts').select('*').order('id'),
       sb.from('agencies').select('*').order('code'),
       sb.from('spend_daily').select('*').gte('date','2025-01-01').order('date',{ascending:false}).limit(20000),
       sb.from('payments').select('*').order('paid_at',{ascending:false}).limit(500),
       sb.from('policy_alerts').select('*').order('detected_at',{ascending:false}).limit(200),
       sb.from('app_settings').select('*'),
-      sb.from('v_agency_debt').select('*')
+      sb.from('v_agency_debt').select('*'),
+      sb.from('ad_account_assignments').select('*').order('start_date')
     ]);
     if(r1.error)throw r1.error;
     if(r2.error)throw r2.error;
@@ -337,12 +365,14 @@ async function loadAll(){
     if(r5.error)throw r5.error;
     if(r6.error)throw r6.error;
     if(r7.error)throw r7.error;
+    // r8 (assignments) — bỏ qua nếu chưa migrate
     adAccounts=r1.data||[];
     agencies=r2.data||[];
     spendDaily=r3.data||[];
     payments=r4.data||[];
     policyAlerts=r5.data||[];
     agencyDebt=r7.data||[];
+    assignments=r8.error?[]:(r8.data||[]);
     settings={};
     (r6.data||[]).forEach(s=>settings[s.key]=s.value);
     metaToken=settings.meta_access_token||'';
@@ -511,7 +541,18 @@ function renderAccounts(){
     <div class="toolbar">
       <button class="btn btn-primary" onclick="openAccountForm()">+ Thêm TKQC</button>
       <span id="auto-sync-indicator" style="font-size:12px;color:var(--tx3);">${metaToken?'⟳ Đang đồng bộ Meta…':'⚠ Cấu hình Meta token ở Admin'}</span>
-      <span style="color:var(--tx3);font-size:12px;margin-left:8px;">Khoảng:</span>
+    </div>
+
+    <div class="toolbar" style="gap:6px;flex-wrap:wrap;">
+      <span style="color:var(--tx3);font-size:12px;">📅</span>
+      <button class="btn btn-ghost btn-sm" onclick="setRange('today')">Hôm nay</button>
+      <button class="btn btn-ghost btn-sm" onclick="setRange('yesterday')">Hôm qua</button>
+      <button class="btn btn-ghost btn-sm" onclick="setRange('7d')">7 ngày</button>
+      <button class="btn btn-ghost btn-sm" onclick="setRange('30d')">30 ngày</button>
+      <button class="btn btn-ghost btn-sm" onclick="setRange('month')">Tháng này</button>
+      <button class="btn btn-ghost btn-sm" onclick="setRange('lastMonth')">Tháng trước</button>
+      <button class="btn btn-ghost btn-sm" onclick="setRange('all')">Toàn kỳ</button>
+      <span style="color:var(--tx3);font-size:12px;margin-left:8px;">Tuỳ chỉnh:</span>
       <input type="date" value="${acFrom}" onchange="acFrom=this.value;renderAccounts()" style="font-size:12px;" />
       <span style="color:var(--tx3);">→</span>
       <input type="date" value="${acTo}" onchange="acTo=this.value;renderAccounts()" style="font-size:12px;" />
@@ -539,11 +580,12 @@ function renderAccounts(){
     adAccounts.forEach(a=>{
       const m=spendMap[a.id]||{native:0,vnd:0,days:new Set()};
       // Quy đổi USD chuẩn: spend native -> VND -> USD
-      const spendVnd=m.vnd||(m.native*(parseFloat(a.exchange_rate)||0));
+      // Nếu currency=VND thì native CHÍNH LÀ VND, không nhân tỉ giá
+      const spendVnd=a.currency==='VND'?m.native:(m.vnd||(m.native*(parseFloat(a.exchange_rate)||0)));
       const spendUsd=spendVnd>0?spendVnd/usdRate:0;
-      // Đại lý hiển thị (link sang trang Đại lý + mở breakdown)
-      const aids=Array.isArray(a.agency_ids)?a.agency_ids:[];
-      const agLinks=aids.map(id=>{const ag=agencies.find(x=>x.id===id);return ag?`<a href="javascript:void(0)" onclick="goAgency(${ag.id})" style="color:var(--blue);text-decoration:none;" title="Mở chi tiêu theo ngày của ${esc(ag.name)}">${esc(ag.name)}</a>`:null;}).filter(Boolean);
+      // Đại lý đang gán (assignment còn active)
+      const actAsns=activeAssignments(a.id);
+      const agLinks=actAsns.map(x=>{const ag=agencies.find(g=>g.id===x.agency_id);if(!ag)return null;const range=fmtDate(x.start_date)+(x.end_date?' → '+fmtDate(x.end_date):' → nay');return `<a href="javascript:void(0)" onclick="goAgency(${ag.id})" style="color:var(--blue);text-decoration:none;" title="${esc(ag.name)} · ${range}">${esc(ag.name)}</a>`;}).filter(Boolean);
       const agText=agLinks.length?agLinks.join(', '):'<span style="color:var(--tx3);">—</span>';
       const isOpen=acExpandedId===a.id;
       html+=`<tr>
@@ -579,7 +621,7 @@ function renderAccounts(){
           html+=`<table style="margin:0;"><thead><tr><th style="font-size:11px;">Ngày</th><th style="font-size:11px;">Số campaign</th><th style="font-size:11px;">Spend</th><th style="font-size:11px;">Quy USD</th></tr></thead><tbody>`;
           days.forEach(d=>{
             const x=byDate[d];
-            const xVnd=x.vnd||(x.native*(parseFloat(a.exchange_rate)||0));
+            const xVnd=a.currency==='VND'?x.native:(x.vnd||(x.native*(parseFloat(a.exchange_rate)||0)));
             const xUsd=xVnd>0?xVnd/usdRate:0;
             html+=`<tr><td style="font-size:12px;">${fmtDate(d)}</td><td class="mono" style="font-size:12px;color:var(--tx3);">${x.n}</td><td class="mono" style="font-size:12px;">${fmtCur(x.native,a.currency)}</td><td class="mono" style="font-size:12px;font-weight:600;color:var(--green);">${xUsd>0?'$'+fmtNum(xUsd,2):'—'}</td></tr>`;
           });
@@ -595,6 +637,29 @@ function renderAccounts(){
 
 function toggleAccountDays(id){
   acExpandedId=acExpandedId===id?null:id;
+  renderAccounts();
+}
+
+function setRange(preset){
+  const today=new Date();
+  const fmt=d=>d.toISOString().slice(0,10);
+  const start=new Date(today);
+  let from,to=fmt(today);
+  switch(preset){
+    case'today':from=fmt(today);break;
+    case'yesterday':start.setDate(start.getDate()-1);from=fmt(start);to=fmt(start);break;
+    case'7d':start.setDate(start.getDate()-6);from=fmt(start);break;
+    case'30d':start.setDate(start.getDate()-29);from=fmt(start);break;
+    case'month':from=fmt(new Date(today.getFullYear(),today.getMonth(),1));break;
+    case'lastMonth':{
+      const fst=new Date(today.getFullYear(),today.getMonth()-1,1);
+      const lst=new Date(today.getFullYear(),today.getMonth(),0);
+      from=fmt(fst);to=fmt(lst);break;
+    }
+    case'all':from='2025-01-01';break;
+    default:return;
+  }
+  acFrom=from;acTo=to;
   renderAccounts();
 }
 
@@ -624,13 +689,12 @@ async function updateExchangeRate(id,val){
   }catch(e){toast('Lỗi: '+e.message,'err');}
 }
 
+window._asnDraft=[];
 function openAccountForm(id){
   const a=id?adAccounts.find(x=>x.id===id):{};
   const isEdit=!!id;
-  const aids=Array.isArray(a.agency_ids)?a.agency_ids:[];
-  const agencyChecks=agencies.length
-    ? agencies.map(ag=>`<label style="display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--bd);border-radius:6px;font-size:12px;cursor:pointer;background:${aids.includes(ag.id)?'var(--bg2)':'transparent'};"><input type="checkbox" class="f-agency-chk" value="${ag.id}" ${aids.includes(ag.id)?'checked':''} /> ${esc(ag.name||ag.code||('#'+ag.id))}</label>`).join('')
-    : '<span style="color:var(--tx3);font-size:12px;">Chưa có đại lý — tạo ở tab Đại lý trước</span>';
+  // Khởi tạo draft assignments từ DB
+  window._asnDraft=isEdit?assignments.filter(x=>x.ad_account_id===id).map(x=>({id:x.id,agency_id:x.agency_id,start_date:x.start_date,end_date:x.end_date})):[];
   const body=`
     <div class="form-grid">
       <div class="form-group"><label>Tên hiển thị *</label><input id="f-name" value="${esc(a.name||'')}" placeholder="VD: TKQC Main USD" /></div>
@@ -644,8 +708,10 @@ function openAccountForm(id){
       <div class="form-group"><label>Business ID</label><input id="f-biz" value="${esc(a.business_id||'')}" /></div>
       <div class="form-group"><label>Active</label><select id="f-active"><option value="true" ${a.is_active!==false?'selected':''}>Có</option><option value="false" ${a.is_active===false?'selected':''}>Không</option></select></div>
     </div>
-    <div class="form-group"><label>Đại lý đang chạy trên TKQC này (chọn nhiều)</label>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;padding:6px;border:1px solid var(--bd);border-radius:6px;max-height:140px;overflow:auto;background:var(--bg);">${agencyChecks}</div>
+    <div class="form-group">
+      <label>Gán đại lý theo khoảng ngày <span style="color:var(--tx3);font-weight:400;">(spend trong khoảng nào → tính cho đại lý đó)</span></label>
+      <div id="asn-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+      <button class="btn btn-ghost btn-sm" onclick="asnAdd()" style="margin-top:6px;align-self:flex-start;">+ Thêm khoảng gán</button>
     </div>
     <div class="form-group"><label>Ghi chú</label><textarea id="f-note">${esc(a.note||'')}</textarea></div>
   `;
@@ -656,10 +722,38 @@ function openAccountForm(id){
     <button class="btn btn-primary" onclick="saveAccount(${id||'null'})">Lưu</button>
   `;
   openModal(isEdit?'Sửa TKQC':'Thêm TKQC',body,foot);
+  asnRender();
+}
+
+function asnRender(){
+  const box=document.getElementById('asn-list');if(!box)return;
+  if(!window._asnDraft.length){box.innerHTML='<div style="color:var(--tx3);font-size:12px;padding:6px;">Chưa có khoảng gán nào — bấm "+ Thêm khoảng gán" để thêm</div>';return;}
+  box.innerHTML=window._asnDraft.map((x,i)=>`
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;border:1px solid var(--bd);border-radius:6px;padding:6px;background:var(--bg);">
+      <select onchange="window._asnDraft[${i}].agency_id=parseInt(this.value)" style="font-size:12px;flex:1;min-width:140px;">
+        <option value="">— Chọn đại lý —</option>
+        ${agencies.map(ag=>`<option value="${ag.id}" ${x.agency_id===ag.id?'selected':''}>${esc(ag.name||ag.code)}</option>`).join('')}
+      </select>
+      <input type="date" value="${x.start_date||''}" onchange="window._asnDraft[${i}].start_date=this.value" style="font-size:12px;" title="Từ ngày" />
+      <span style="color:var(--tx3);">→</span>
+      <input type="date" value="${x.end_date||''}" onchange="window._asnDraft[${i}].end_date=this.value||null" style="font-size:12px;" title="Đến ngày (trống = đang chạy)" />
+      <button class="btn btn-ghost btn-sm" onclick="asnRemove(${i})" style="color:var(--red);" title="Xoá">✕</button>
+    </div>
+  `).join('');
+}
+
+function asnAdd(){
+  window._asnDraft.push({agency_id:null,start_date:'2026-01-01',end_date:null});
+  asnRender();
+}
+function asnRemove(i){
+  window._asnDraft.splice(i,1);
+  asnRender();
 }
 
 async function saveAccount(id){
-  const agencyIds=Array.from(document.querySelectorAll('.f-agency-chk:checked')).map(c=>parseInt(c.value)).filter(Boolean);
+  const draft=(window._asnDraft||[]).filter(x=>x.agency_id&&x.start_date);
+  const agencyIds=[...new Set(draft.map(x=>x.agency_id))];
   const data={
     name:document.getElementById('f-name').value.trim(),
     meta_account_id:document.getElementById('f-mid').value.trim(),
@@ -676,15 +770,25 @@ async function saveAccount(id){
   };
   if(!data.name||!data.meta_account_id)return toast('Tên và Meta Account ID bắt buộc','err');
   try{
+    let accId=id;
     if(id){
       const {error}=await sb.from('ad_accounts').update(data).eq('id',id);
       if(error)throw error;
-      toast('Đã cập nhật','ok');
     }else{
-      const {error}=await sb.from('ad_accounts').insert(data);
+      const {data:ins,error}=await sb.from('ad_accounts').insert(data).select().single();
       if(error)throw error;
-      toast('Đã thêm TKQC','ok');
+      accId=ins.id;
     }
+    // Sync assignments: xoá hết của TKQC này rồi insert lại từ draft
+    if(accId){
+      await sb.from('ad_account_assignments').delete().eq('ad_account_id',accId);
+      if(draft.length){
+        const rows=draft.map(x=>({ad_account_id:accId,agency_id:x.agency_id,start_date:x.start_date,end_date:x.end_date||null}));
+        const {error:e2}=await sb.from('ad_account_assignments').insert(rows);
+        if(e2)throw e2;
+      }
+    }
+    toast('Đã lưu','ok');
     closeModal();
     await loadAll();renderAccounts();
   }catch(e){toast('Lỗi: '+e.message,'err');}
@@ -749,14 +853,7 @@ function renderAgencies(){
   if(!list.length){
     html+=`<tr><td colspan="13"><div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-title">Chưa có khách hàng</div><div class="empty-state-desc">Bấm "+ Thêm khách hàng" để bắt đầu</div></div></td></tr>`;
   }else{
-    // Map TKQC -> danh sách đại lý đang chạy (gộp cả agency_ids[] mới + ad_account_id cũ)
-    const accAgencies={};
-    adAccounts.forEach(acc=>{
-      const ids=new Set(Array.isArray(acc.agency_ids)?acc.agency_ids:[]);
-      agencies.filter(ag=>ag.ad_account_id===acc.id).forEach(ag=>ids.add(ag.id));
-      accAgencies[acc.id]=Array.from(ids);
-    });
-    // tổng spend per agency: ưu tiên match qua agency_id (mã campaign), fallback TKQC độc-1-đại-lý
+    // tổng spend per agency: ưu tiên mã campaign, fallback assignment khoảng ngày (KHÔNG chia)
     const spendSum={};agencies.forEach(a=>spendSum[a.id]=0);
     const usdRate2=parseFloat(settings.usd_to_vnd_rate)||26800;
     spendDaily.forEach(s=>{
@@ -764,15 +861,14 @@ function renderAgencies(){
         spendSum[s.agency_id]+=parseFloat(s.spend_native)||0;
         return;
       }
-      const ids=accAgencies[s.ad_account_id]||[];
-      if(ids.length===1&&spendSum[ids[0]]!=null){
-        spendSum[ids[0]]+=parseFloat(s.spend_native)||0;
-      }
+      const ag=findAgencyForSpend(s.ad_account_id,s.date);
+      if(ag&&spendSum[ag]!=null)spendSum[ag]+=parseFloat(s.spend_native)||0;
     });
-    // TKQC tổng đã link cho mỗi đại lý (để hiển thị)
+    // TKQC đang link với mỗi đại lý (assignment còn active)
     const accListByAgency={};
     agencies.forEach(a=>{
-      accListByAgency[a.id]=adAccounts.filter(acc=>(accAgencies[acc.id]||[]).includes(a.id));
+      const accIds=new Set(activeAssignmentsForAgency(a.id).map(x=>x.ad_account_id));
+      accListByAgency[a.id]=adAccounts.filter(acc=>accIds.has(acc.id));
     });
     list.forEach((a,idx)=>{
       const linkedAccs=accListByAgency[a.id]||[];
@@ -809,14 +905,14 @@ function renderAgencies(){
         </td>
       </tr>`;
       if(isOpenAg){
-        // Phân bổ spend theo ngày: ưu tiên agency_id (campaign code), fallback TKQC độc-1-đại-lý
+        // Phân bổ spend theo ngày: ưu tiên mã campaign, fallback assignment khoảng ngày (100% hoặc 0%)
         const byDate={};
         spendDaily.forEach(s=>{
           let belong=false;
           if(s.agency_id===a.id)belong=true;
-          else{
-            const ids=accAgencies[s.ad_account_id]||[];
-            if(ids.length===1&&ids[0]===a.id&&!s.agency_id)belong=true;
+          else if(!s.agency_id){
+            const ag=findAgencyForSpend(s.ad_account_id,s.date);
+            if(ag===a.id)belong=true;
           }
           if(!belong)return;
           if(!byDate[s.date])byDate[s.date]={native:0,vnd:0,n:0,accs:new Set()};
