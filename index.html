@@ -247,6 +247,7 @@ let adAccounts=[],agencies=[],spendDaily=[],payments=[],policyAlerts=[],settings
 let agencyDebt=[]; // computed from view v_agency_debt
 let metaToken='',metaBusinessId='',codePattern='^([A-Z0-9]+)-';
 let filterDateFrom='',filterDateTo='',filterAgencyId='',filterAccountId='';
+let acFrom='2025-01-01',acTo='',acExpandedId=null;
 let isLoading=false;
 
 // ─── Helpers ───
@@ -323,7 +324,7 @@ async function loadAll(){
     const [r1,r2,r3,r4,r5,r6,r7]=await Promise.all([
       sb.from('ad_accounts').select('*').order('id'),
       sb.from('agencies').select('*').order('code'),
-      sb.from('spend_daily').select('*').gte('date',monthAgo()).order('date',{ascending:false}).limit(2000),
+      sb.from('spend_daily').select('*').gte('date','2025-01-01').order('date',{ascending:false}).limit(20000),
       sb.from('payments').select('*').order('paid_at',{ascending:false}).limit(500),
       sb.from('policy_alerts').select('*').order('detected_at',{ascending:false}).limit(200),
       sb.from('app_settings').select('*'),
@@ -476,25 +477,42 @@ function renderOverview(){
 // PAGE 1: TÀI KHOẢN QUẢNG CÁO
 // ═══════════════════════════════════════════════════════════════
 function renderAccounts(){
+  if(!acTo)acTo=todayStr();
+  // Aggregate spend per ad_account_id within [acFrom..acTo]
+  const spendMap={};
+  spendDaily.forEach(s=>{
+    if(acFrom&&s.date<acFrom)return;
+    if(acTo&&s.date>acTo)return;
+    if(!spendMap[s.ad_account_id])spendMap[s.ad_account_id]={native:0,vnd:0,days:new Set()};
+    spendMap[s.ad_account_id].native+=parseFloat(s.spend_native)||0;
+    spendMap[s.ad_account_id].vnd+=parseInt(s.amount_vnd)||0;
+    spendMap[s.ad_account_id].days.add(s.date);
+  });
+
   let html=`
     <h1 class="page-title">Tài khoản quảng cáo</h1>
-    <p class="page-sub">Quản lý ${adAccounts.length} TKQC · Tỷ giá nhập tay theo từng tài khoản</p>
+    <p class="page-sub">Quản lý ${adAccounts.length} TKQC · Chi tiêu từ ${fmtDate(acFrom)} → ${fmtDate(acTo)}</p>
 
     <div class="toolbar">
       <button class="btn btn-primary" onclick="openAccountForm()">+ Thêm TKQC</button>
       <button class="btn btn-green" onclick="syncMeta()" ${metaToken?'':'disabled title="Cấu hình Meta token ở tab Admin trước"'}>⟳ Sync Meta API</button>
+      <span style="color:var(--tx3);font-size:12px;margin-left:8px;">Khoảng:</span>
+      <input type="date" value="${acFrom}" onchange="acFrom=this.value;renderAccounts()" style="font-size:12px;" />
+      <span style="color:var(--tx3);">→</span>
+      <input type="date" value="${acTo}" onchange="acTo=this.value;renderAccounts()" style="font-size:12px;" />
+      <button class="btn btn-ghost btn-sm" onclick="acFrom='2025-01-01';acTo=todayStr();renderAccounts()" title="Từ đầu 2025 → hôm nay">Toàn kỳ</button>
       <div style="margin-left:auto;font-size:12px;color:var(--tx3);">Tổng balance: ${adAccounts.reduce((a,b)=>a+(parseFloat(b.balance)||0),0).toFixed(2)}</div>
     </div>
 
     <div class="table-wrap"><div class="table-scroll"><table>
       <thead><tr>
         <th>Tên</th><th>ID</th><th>Tiền tệ</th><th>Tỷ giá VNĐ</th>
-        <th>Đã tiêu</th><th>Đã tiêu (VNĐ)</th><th>Số dư</th><th>Trạng thái</th><th>Cập nhật</th><th></th>
+        <th>Chi tiêu (kỳ)</th><th>Chi tiêu VNĐ (kỳ)</th><th>Số ngày</th><th>Số dư</th><th>Trạng thái</th><th>Cập nhật</th><th></th>
       </tr></thead>
       <tbody>`;
   if(!adAccounts.length){
     const canDiscover=metaToken&&metaBusinessId;
-    html+=`<tr><td colspan="10"><div class="empty-state">
+    html+=`<tr><td colspan="11"><div class="empty-state">
       <div class="empty-state-icon">💳</div>
       <div class="empty-state-title">Chưa có TKQC</div>
       <div class="empty-state-desc">${canDiscover?'Tải tự động từ Business Manager hoặc thêm tay':'Cấu hình Meta token ở tab Admin để tải tự động, hoặc thêm tay'}</div>
@@ -507,25 +525,59 @@ function renderAccounts(){
   }else{
     adAccounts.forEach(a=>{
       const balLow=(parseFloat(a.balance)||0)<10&&a.currency!=='VND';
-      const spentNative=parseFloat(a.amount_spent)||0;
-      const rate=parseFloat(a.exchange_rate)||0;
-      const spentVnd=a.currency==='VND'?spentNative:spentNative*rate;
+      const m=spendMap[a.id]||{native:0,vnd:0,days:new Set()};
+      const isOpen=acExpandedId===a.id;
       html+=`<tr>
         <td><div style="font-weight:500;">${esc(a.name)}</div><div style="font-size:11px;color:var(--tx3);">${a.is_active?'Active':'<span style="color:var(--red);">Inactive</span>'}</div></td>
         <td class="mono" style="font-size:12px;color:var(--tx3);">${esc(a.meta_account_id)}</td>
         <td><span class="badge b-${a.currency==='USD'?'green':(a.currency==='EUR'?'amber':'blue')}">${esc(a.currency)}</span></td>
         <td><input class="inline-input" type="number" step="0.0001" value="${a.exchange_rate||0}" onchange="updateExchangeRate(${a.id},this.value)" /></td>
-        <td class="mono">${fmtCur(a.amount_spent,a.currency)}</td>
-        <td class="mono" style="font-weight:600;color:var(--ink);">${spentVnd>0?fmtVnd(spentVnd):'<span style="color:var(--tx3);font-weight:400;">—</span>'}</td>
-        <td class="mono ${balLow?'':''}" style="${balLow?'color:var(--red);font-weight:600;':''}">${fmtCur(a.balance,a.currency)}</td>
+        <td class="mono">${m.native>0?fmtCur(m.native,a.currency):'<span style="color:var(--tx3);">—</span>'}</td>
+        <td class="mono" style="font-weight:600;">${m.vnd>0?fmtVnd(m.vnd):'<span style="color:var(--tx3);font-weight:400;">—</span>'}</td>
+        <td class="mono" style="font-size:12px;color:var(--tx3);">${m.days.size||0}</td>
+        <td class="mono" style="${balLow?'color:var(--red);font-weight:600;':''}">${fmtCur(a.balance,a.currency)}</td>
         <td>${statusBadge(a.status)}</td>
         <td style="font-size:12px;color:var(--tx3);">${a.updated_at?fmtDate(a.updated_at):'—'}</td>
-        <td><button class="btn btn-ghost btn-sm" onclick="openAccountForm(${a.id})">Sửa</button></td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-ghost btn-sm" onclick="toggleAccountDays(${a.id})" title="Xem chi tiêu từng ngày">${isOpen?'▾ Ẩn':'▸ Theo ngày'}</button>
+          <button class="btn btn-ghost btn-sm" onclick="openAccountForm(${a.id})">Sửa</button>
+        </td>
       </tr>`;
+      if(isOpen){
+        const byDate={};
+        spendDaily.forEach(s=>{
+          if(s.ad_account_id!==a.id)return;
+          if(acFrom&&s.date<acFrom)return;
+          if(acTo&&s.date>acTo)return;
+          if(!byDate[s.date])byDate[s.date]={native:0,vnd:0,n:0};
+          byDate[s.date].native+=parseFloat(s.spend_native)||0;
+          byDate[s.date].vnd+=parseInt(s.amount_vnd)||0;
+          byDate[s.date].n++;
+        });
+        const days=Object.keys(byDate).sort().reverse();
+        html+=`<tr><td colspan="11" style="padding:0;background:var(--bg2);">
+          <div style="padding:10px 16px;font-size:12px;color:var(--tx3);">Chi tiêu theo ngày của <b>${esc(a.name)}</b> · ${days.length} ngày</div>`;
+        if(!days.length){
+          html+=`<div style="padding:14px;text-align:center;color:var(--tx3);font-size:12px;">Không có chi tiêu trong khoảng đã chọn — thử bấm Sync Meta API</div>`;
+        }else{
+          html+=`<table style="margin:0;"><thead><tr><th style="font-size:11px;">Ngày</th><th style="font-size:11px;">Số campaign</th><th style="font-size:11px;">Spend</th><th style="font-size:11px;">VNĐ thu khách</th></tr></thead><tbody>`;
+          days.forEach(d=>{
+            const x=byDate[d];
+            html+=`<tr><td style="font-size:12px;">${fmtDate(d)}</td><td class="mono" style="font-size:12px;color:var(--tx3);">${x.n}</td><td class="mono" style="font-size:12px;">${fmtCur(x.native,a.currency)}</td><td class="mono" style="font-size:12px;font-weight:600;">${fmtVnd(x.vnd)}</td></tr>`;
+          });
+          html+=`</tbody></table>`;
+        }
+        html+=`</td></tr>`;
+      }
     });
   }
   html+=`</tbody></table></div></div>`;
   document.getElementById('page').innerHTML=html;
+}
+
+function toggleAccountDays(id){
+  acExpandedId=acExpandedId===id?null:id;
+  renderAccounts();
 }
 
 async function updateExchangeRate(id,val){
@@ -1326,7 +1378,7 @@ async function syncMeta(){
   let totalCampaigns=0,totalRows=0,errors=0;
   try{
     const today=todayStr();
-    const since=monthAgo();
+    const since=(typeof syncSinceOverride!=='undefined'&&syncSinceOverride)||'2025-01-01';
     for(const acc of adAccounts){
       if(!acc.is_active)continue;
       // 1. Pull account info (status, balance, amount_spent)
